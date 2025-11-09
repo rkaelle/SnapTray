@@ -1,0 +1,412 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A100000000000001 /* SnapTrayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000002 /* SnapTrayApp.swift */; };
+		A100000000000003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000004 /* ContentView.swift */; };
+		A100000000000005 /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000006 /* Project.swift */; };
+		A100000000000007 /* LiDARCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000008 /* LiDARCaptureManager.swift */; };
+		A100000000000009 /* ArucoDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000010 /* ArucoDetector.swift */; };
+		A100000000000011 /* SegmentationProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000012 /* SegmentationProcessor.swift */; };
+		A100000000000013 /* GeometryProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000014 /* GeometryProcessor.swift */; };
+		A100000000000015 /* DXFExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000016 /* DXFExporter.swift */; };
+		A100000000000017 /* STLExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000018 /* STLExporter.swift */; };
+		A100000000000019 /* PDFExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000020 /* PDFExporter.swift */; };
+		A100000000000021 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000022 /* CaptureView.swift */; };
+		A100000000000023 /* ConfirmView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000024 /* ConfirmView.swift */; };
+		A100000000000025 /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000026 /* ExportView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A100000000000002 /* SnapTrayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapTrayApp.swift; sourceTree = "<group>"; };
+		A100000000000004 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A100000000000006 /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
+		A100000000000008 /* LiDARCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiDARCaptureManager.swift; sourceTree = "<group>"; };
+		A100000000000010 /* ArucoDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArucoDetector.swift; sourceTree = "<group>"; };
+		A100000000000012 /* SegmentationProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SegmentationProcessor.swift; sourceTree = "<group>"; };
+		A100000000000014 /* GeometryProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeometryProcessor.swift; sourceTree = "<group>"; };
+		A100000000000016 /* DXFExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DXFExporter.swift; sourceTree = "<group>"; };
+		A100000000000018 /* STLExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = STLExporter.swift; sourceTree = "<group>"; };
+		A100000000000020 /* PDFExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFExporter.swift; sourceTree = "<group>"; };
+		A100000000000022 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
+		A100000000000024 /* ConfirmView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmView.swift; sourceTree = "<group>"; };
+		A100000000000026 /* ExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportView.swift; sourceTree = "<group>"; };
+		A100000000000027 /* SnapTrayApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapTrayApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A100000000000028 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A100000000000029 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A100000000000030 = {
+			isa = PBXGroup;
+			children = (
+				A100000000000031 /* SnapTrayApp */,
+				A100000000000032 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A100000000000031 /* SnapTrayApp */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000002 /* SnapTrayApp.swift */,
+				A100000000000028 /* Info.plist */,
+				A100000000000033 /* Models */,
+				A100000000000034 /* Processors */,
+				A100000000000035 /* Exporters */,
+				A100000000000036 /* Views */,
+			);
+			path = SnapTrayApp;
+			sourceTree = "<group>";
+		};
+		A100000000000032 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000027 /* SnapTrayApp.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A100000000000033 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000006 /* Project.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A100000000000034 /* Processors */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000008 /* LiDARCaptureManager.swift */,
+				A100000000000010 /* ArucoDetector.swift */,
+				A100000000000012 /* SegmentationProcessor.swift */,
+				A100000000000014 /* GeometryProcessor.swift */,
+			);
+			path = Processors;
+			sourceTree = "<group>";
+		};
+		A100000000000035 /* Exporters */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000016 /* DXFExporter.swift */,
+				A100000000000018 /* STLExporter.swift */,
+				A100000000000020 /* PDFExporter.swift */,
+			);
+			path = Exporters;
+			sourceTree = "<group>";
+		};
+		A100000000000036 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000004 /* ContentView.swift */,
+				A100000000000022 /* CaptureView.swift */,
+				A100000000000024 /* ConfirmView.swift */,
+				A100000000000026 /* ExportView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A100000000000037 /* SnapTrayApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A100000000000038 /* Build configuration list for PBXNativeTarget "SnapTrayApp" */;
+			buildPhases = (
+				A100000000000039 /* Sources */,
+				A100000000000029 /* Frameworks */,
+				A100000000000040 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SnapTrayApp;
+			productName = SnapTrayApp;
+			productReference = A100000000000027 /* SnapTrayApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A100000000000041 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					A100000000000037 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = A100000000000042 /* Build configuration list for PBXProject "SnapTrayApp" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A100000000000030;
+			productRefGroup = A100000000000032 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A100000000000037 /* SnapTrayApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A100000000000040 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A100000000000039 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A100000000000001 /* SnapTrayApp.swift in Sources */,
+				A100000000000003 /* ContentView.swift in Sources */,
+				A100000000000005 /* Project.swift in Sources */,
+				A100000000000007 /* LiDARCaptureManager.swift in Sources */,
+				A100000000000009 /* ArucoDetector.swift in Sources */,
+				A100000000000011 /* SegmentationProcessor.swift in Sources */,
+				A100000000000013 /* GeometryProcessor.swift in Sources */,
+				A100000000000015 /* DXFExporter.swift in Sources */,
+				A100000000000017 /* STLExporter.swift in Sources */,
+				A100000000000019 /* PDFExporter.swift in Sources */,
+				A100000000000021 /* CaptureView.swift in Sources */,
+				A100000000000023 /* ConfirmView.swift in Sources */,
+				A100000000000025 /* ExportView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A100000000000043 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SnapTrayApp/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "SnapTray needs camera access to capture images of your tools.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "SnapTray needs photo library access to save exported files.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snaptray.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A100000000000044 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SnapTrayApp/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "SnapTray needs camera access to capture images of your tools.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "SnapTray needs photo library access to save exported files.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snaptray.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A100000000000045 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A100000000000046 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A100000000000038 /* Build configuration list for PBXNativeTarget "SnapTrayApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A100000000000043 /* Debug */,
+				A100000000000044 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A100000000000042 /* Build configuration list for PBXProject "SnapTrayApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A100000000000045 /* Debug */,
+				A100000000000046 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A100000000000041 /* Project object */;
+}
