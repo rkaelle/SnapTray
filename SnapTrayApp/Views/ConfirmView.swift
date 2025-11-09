@@ -325,12 +325,8 @@ struct ToolDetailView: View {
             }
             .navigationTitle("Tool Details")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(content: {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
+            .navigationBarItems(trailing: Button("Done") {
+                dismiss()
             })
         }
     }
@@ -432,12 +428,8 @@ struct TraySettingsView: View {
             }
             .navigationTitle("Tray Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(content: {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
+            .navigationBarItems(trailing: Button("Done") {
+                dismiss()
             })
         }
     }

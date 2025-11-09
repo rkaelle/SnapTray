@@ -111,10 +111,10 @@ class LiDARCaptureManager: NSObject, ObservableObject {
         let intrinsics = camera.intrinsics
 
         // Sample every 4th pixel for performance
-        let stride = 4
+        let pixelStride = 4
 
-        for y in stride(from: 0, to: depthHeight, by: stride) {
-            for x in stride(from: 0, to: depthWidth, by: stride) {
+        for y in stride(from: 0, to: depthHeight, by: pixelStride) {
+            for x in stride(from: 0, to: depthWidth, by: pixelStride) {
                 let index = y * depthWidth + x
                 let depth = depthPointer[index]
                 let conf = confidencePointer[index]
