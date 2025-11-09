@@ -160,8 +160,8 @@ class GeometryProcessor {
             let angle = startAngle + angleDiff * t
 
             let point = CGPoint(
-                x: center.x + radius * cos(angle),
-                y: center.y + radius * sin(angle)
+                x: center.x + CGFloat(radius * Darwin.cos(angle)),
+                y: center.y + CGFloat(radius * Darwin.sin(angle))
             )
             points.append(point)
         }
@@ -193,8 +193,8 @@ class GeometryProcessor {
         for i in 0...segments {
             let angle = .pi * Double(i) / Double(segments)
             let offset = CGPoint(
-                x: notchCenter.x + perpDir.x * notch.radius * sin(angle) + edgeDir.x * notch.radius * cos(angle),
-                y: notchCenter.y + perpDir.y * notch.radius * sin(angle) + edgeDir.y * notch.radius * cos(angle)
+                x: notchCenter.x + perpDir.x * notch.radius * Darwin.sin(angle) + edgeDir.x * notch.radius * Darwin.cos(angle),
+                y: notchCenter.y + perpDir.y * notch.radius * Darwin.sin(angle) + edgeDir.y * notch.radius * Darwin.cos(angle)
             )
             notchPoints.append(offset)
         }
