@@ -33,6 +33,46 @@ struct Project: Codable, Identifiable {
         self.tools = []
         self.traySettings = TraySettings()
     }
+
+    // Custom Codable implementation to skip cameraTransform (matrix_float4x4 doesn't conform to Codable)
+    enum CodingKeys: String, CodingKey {
+        case id, name, createdDate, modifiedDate
+        case capturedImage, depthMap
+        case fiducials, workspaceBounds, pixelToMMScale
+        case tools, traySettings
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        createdDate = try container.decode(Date.self, forKey: .createdDate)
+        modifiedDate = try container.decode(Date.self, forKey: .modifiedDate)
+        capturedImage = try container.decodeIfPresent(Data.self, forKey: .capturedImage)
+        depthMap = try container.decodeIfPresent(Data.self, forKey: .depthMap)
+        fiducials = try container.decode([Fiducial].self, forKey: .fiducials)
+        workspaceBounds = try container.decodeIfPresent(CGRect.self, forKey: .workspaceBounds)
+        pixelToMMScale = try container.decodeIfPresent(Double.self, forKey: .pixelToMMScale)
+        tools = try container.decode([Tool].self, forKey: .tools)
+        traySettings = try container.decode(TraySettings.self, forKey: .traySettings)
+        cameraTransform = nil  // Not persisted
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(createdDate, forKey: .createdDate)
+        try container.encode(modifiedDate, forKey: .modifiedDate)
+        try container.encodeIfPresent(capturedImage, forKey: .capturedImage)
+        try container.encodeIfPresent(depthMap, forKey: .depthMap)
+        try container.encode(fiducials, forKey: .fiducials)
+        try container.encodeIfPresent(workspaceBounds, forKey: .workspaceBounds)
+        try container.encodeIfPresent(pixelToMMScale, forKey: .pixelToMMScale)
+        try container.encode(tools, forKey: .tools)
+        try container.encode(traySettings, forKey: .traySettings)
+        // cameraTransform is not encoded (matrix_float4x4 doesn't conform to Codable)
+    }
 }
 
 struct Fiducial: Codable, Identifiable {
