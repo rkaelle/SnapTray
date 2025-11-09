@@ -191,7 +191,7 @@ class STLExporter {
         var data = Data()
 
         // Header (80 bytes)
-        var header = name.padding(toLength: 80, withPad: " ", startingAt: 0)
+        let header = name.padding(toLength: 80, withPad: " ", startingAt: 0)
         data.append(header.data(using: .ascii)!)
 
         // Number of triangles (4 bytes, little endian)

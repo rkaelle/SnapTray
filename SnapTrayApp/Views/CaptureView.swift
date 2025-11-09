@@ -30,7 +30,7 @@ struct CaptureView: View {
 
                     Spacer()
 
-                    if let plane = lidarManager.detectedPlane {
+                    if lidarManager.detectedPlane != nil {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)

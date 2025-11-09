@@ -123,18 +123,9 @@ class ArucoDetector {
     }
 
     private func detectCoins(in image: UIImage) -> [(center: CGPoint, radius: Double)] {
-        guard let cgImage = image.cgImage else { return [] }
-
-        var coins: [(CGPoint, Double)] = []
-
-        // Use Hough Circle Transform approach
-        let request = VNDetectContoursRequest()
-        request.contrastAdjustment = 1.5
-
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-
         // Note: Actual contour-based circle detection requires more complex algorithms
         // For now, return empty array - coin detection is backup to ArUco markers
+        // In production, this would use Hough Circle Transform via Accelerate framework
         return []
     }
 
