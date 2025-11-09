@@ -9,7 +9,7 @@ class LiDARCaptureManager: NSObject, ObservableObject {
     @Published var detectedPlane: DetectedPlane?
     @Published var workspaceBounds: CGRect?
 
-    private var arSession: ARSession?
+    var arSession: ARSession?  // Internal access for ARCameraView
     private var accumulatedDepthFrames: [ARFrame] = []
     private let maxAccumulatedFrames = 30  // ~1 second at 30fps
 
