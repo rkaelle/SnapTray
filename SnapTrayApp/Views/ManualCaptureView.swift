@@ -19,6 +19,8 @@ struct ManualCaptureView: View {
     @State private var screenSize: CGSize = .zero
     @State private var detectionTimer: Timer?
     @State private var detectedArucoMarkers: [DetectedArucoMarker] = []
+    @State private var heatMapPoints: [CGPoint] = []  // Points above plane for heat map visualization
+    @State private var showHeatMap = true  // Toggle heat map visibility
 
     enum CaptureMode {
         case manual      // User taps to place corners
@@ -125,6 +127,16 @@ struct ManualCaptureView: View {
                             .position(marker.center)
                     }
                 }
+
+                // Heat map overlay - visualize points above plane
+                if showHeatMap && !heatMapPoints.isEmpty {
+                    ForEach(Array(heatMapPoints.enumerated()), id: \.offset) { _, point in
+                        Circle()
+                            .fill(Color.orange.opacity(0.6))
+                            .frame(width: 4, height: 4)
+                            .position(point)
+                    }
+                }
             }
             .allowsHitTesting(false)
 
@@ -152,6 +164,21 @@ struct ManualCaptureView: View {
                     }
 
                     Spacer()
+
+                    // Heat map toggle
+                    Button(action: { showHeatMap.toggle() }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: showHeatMap ? "circle.hexagongrid.fill" : "circle.hexagongrid")
+                            Text("Heat")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(showHeatMap ? Color.orange : Color.gray.opacity(0.3))
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
 
                     // Mode toggle
                     Button(action: toggleMode) {
@@ -519,6 +546,13 @@ struct ManualCaptureView: View {
                         self.updateCornerProjections(frame: frame)
                     }
 
+                    // Update heat map every frame if enabled
+                    if self.showHeatMap {
+                        self.updateHeatMap(frame: frame)
+                    } else {
+                        self.heatMapPoints.removeAll()
+                    }
+
                     // Check for ArUco markers every 0.5 seconds in automatic mode
                     if self.captureMode == .automatic && Date().timeIntervalSince(lastMarkerCheck) > 0.5 {
                         lastMarkerCheck = Date()
@@ -566,6 +600,77 @@ struct ManualCaptureView: View {
             cornerPoints = updatedPoints
             cornerScales = updatedScales
         }
+    }
+
+    private func updateHeatMap(frame: ARFrame) {
+        guard let plane = lidarManager.detectedPlane,
+              let sceneDepth = frame.sceneDepth else {
+            heatMapPoints.removeAll()
+            return
+        }
+
+        let depthMap = sceneDepth.depthMap
+        let depthWidth = CVPixelBufferGetWidth(depthMap)
+        let depthHeight = CVPixelBufferGetHeight(depthMap)
+
+        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+
+        guard let depthData = CVPixelBufferGetBaseAddress(depthMap) else {
+            heatMapPoints.removeAll()
+            return
+        }
+
+        let depthPointer = depthData.assumingMemoryBound(to: Float32.self)
+        let rowBytes = CVPixelBufferGetBytesPerRow(depthMap)
+        let floatsPerRow = rowBytes / MemoryLayout<Float32>.stride
+
+        var points: [CGPoint] = []
+        let heightThreshold: Float = 0.003  // 3mm above plane
+
+        // Sample every 8th pixel for performance (still ~1000 points)
+        let stride = 8
+
+        for y in stride(from: 0, to: depthHeight, by: stride) {
+            for x in stride(from: 0, to: depthWidth, by: stride) {
+                let depth = depthPointer[y * floatsPerRow + x]
+                guard depth > 0 && depth < 5.0 else { continue }
+
+                // Convert depth pixel to 3D world position
+                let normalizedX = Float(x) / Float(depthWidth - 1)
+                let normalizedY = Float(y) / Float(depthHeight - 1)
+
+                let viewportPoint = CGPoint(x: CGFloat(normalizedX), y: CGFloat(normalizedY))
+                guard let ray = frame.camera.unprojectPoint(
+                    viewportPoint,
+                    ontoPlaneWithTransform: matrix_identity_float4x4,
+                    orientation: .portrait,
+                    viewportSize: CGSize(width: depthWidth, height: depthHeight)
+                ) else {
+                    continue
+                }
+
+                let worldPosition = ray * depth
+
+                // Check if point is above plane
+                let pointToPlane = worldPosition - plane.center
+                let distance = simd_dot(pointToPlane, plane.normal)
+
+                if distance > heightThreshold {
+                    // Project 3D point to screen
+                    if let screenPos = projectToScreen(worldPosition: worldPosition, frame: frame) {
+                        points.append(screenPos)
+                    }
+                }
+            }
+        }
+
+        // Limit to reasonable number of points for performance
+        if points.count > 2000 {
+            points = Array(points.prefix(2000))
+        }
+
+        heatMapPoints = points
     }
 
     private func checkForArucoMarkersLive() {
@@ -690,7 +795,22 @@ struct ManualCaptureView: View {
             let minY = projectedCorners.map { $0.y }.min() ?? 0
             let maxY = projectedCorners.map { $0.y }.max() ?? captured.image.size.height
 
-            workspaceBounds = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+            // Add padding to workspace bounds to be more forgiving (10% on each side)
+            let boundsWidth = maxX - minX
+            let boundsHeight = maxY - minY
+            let paddingX = boundsWidth * 0.1
+            let paddingY = boundsHeight * 0.1
+
+            workspaceBounds = CGRect(
+                x: max(0, minX - paddingX),
+                y: max(0, minY - paddingY),
+                width: min(captured.image.size.width - max(0, minX - paddingX), boundsWidth + 2 * paddingX),
+                height: min(captured.image.size.height - max(0, minY - paddingY), boundsHeight + 2 * paddingY)
+            )
+
+            print("📦 Workspace bounds (with padding): \(workspaceBounds)")
+            print("   Corners projected: \(projectedCorners)")
+            print("   Image size: \(captured.image.size)")
 
             // Calculate real-world scale from 3D distances
             // Use the distance between first two corners as reference

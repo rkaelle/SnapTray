@@ -151,6 +151,11 @@ class SegmentationProcessor {
         // Filter by workspace bounds
         var filteredContours = scaledContours
         if let bounds = workspaceBounds {
+            print("   Workspace bounds: \(bounds)")
+            for (i, contour) in scaledContours.enumerated() {
+                let intersects = isContourInBounds(contour, bounds: bounds)
+                print("   Contour \(i): bbox=\(contour.boundingBox), area=\(contour.area), intersects=\(intersects)")
+            }
             filteredContours = scaledContours.filter { isContourInBounds($0, bounds: bounds) }
             print("   After workspace filter: \(filteredContours.count)")
         }
