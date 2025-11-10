@@ -629,10 +629,10 @@ struct ManualCaptureView: View {
         let heightThreshold: Float = 0.003  // 3mm above plane
 
         // Sample every 8th pixel for performance (still ~1000 points)
-        let stride = 8
+        let stepSize = 8
 
-        for y in stride(from: 0, to: depthHeight, by: stride) {
-            for x in stride(from: 0, to: depthWidth, by: stride) {
+        for y in Swift.stride(from: 0, to: depthHeight, by: stepSize) {
+            for x in Swift.stride(from: 0, to: depthWidth, by: stepSize) {
                 let depth = depthPointer[y * floatsPerRow + x]
                 guard depth > 0 && depth < 5.0 else { continue }
 
@@ -643,7 +643,7 @@ struct ManualCaptureView: View {
                 let viewportPoint = CGPoint(x: CGFloat(normalizedX), y: CGFloat(normalizedY))
                 guard let ray = frame.camera.unprojectPoint(
                     viewportPoint,
-                    ontoPlaneWithTransform: matrix_identity_float4x4,
+                    ontoPlane: matrix_identity_float4x4,
                     orientation: .portrait,
                     viewportSize: CGSize(width: depthWidth, height: depthHeight)
                 ) else {

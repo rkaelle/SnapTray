@@ -173,7 +173,7 @@ class SegmentationProcessor {
     // Helper: Morphological closing on mask
     private func morphologicalCloseMask(_ input: [UInt8], width: Int, height: Int, kernelSize: Int) -> [UInt8] {
         // Dilate
-        var dilated = morphologicalOperation(input, width: width, height: height, kernelSize: kernelSize, isDilation: true)
+        let dilated = morphologicalOperation(input, width: width, height: height, kernelSize: kernelSize, isDilation: true)
         // Erode
         return morphologicalOperation(dilated, width: width, height: height, kernelSize: kernelSize, isDilation: false)
     }
@@ -326,7 +326,7 @@ class SegmentationProcessor {
 
         var contours: [Contour] = []
 
-        if let results = request.results as? [VNRectangleObservation] {
+        if let results = request.results {
             for observation in results {
                 // Convert normalized coordinates to image coordinates
                 let width = CGFloat(cgImage.width)
