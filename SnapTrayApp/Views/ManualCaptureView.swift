@@ -17,10 +17,18 @@ struct ManualCaptureView: View {
     @State private var reticlePosition: CGPoint = .zero
     @State private var screenSize: CGSize = .zero
     @State private var detectionTimer: Timer?
+    @State private var detectedArucoMarkers: [DetectedArucoMarker] = []
 
     enum CaptureMode {
         case manual      // User taps to place corners
         case automatic   // ArUco marker detection
+    }
+
+    struct DetectedArucoMarker: Identifiable {
+        let id = UUID()
+        let markerId: Int
+        let corners: [CGPoint]
+        let center: CGPoint
     }
 
     struct DetectionStatus {
@@ -72,6 +80,40 @@ struct ManualCaptureView: View {
                         }
                     }
                     .stroke(Color.blue.opacity(0.6), lineWidth: 2)
+                }
+
+                // ArUco markers overlay (in automatic mode)
+                if captureMode == .automatic {
+                    ForEach(detectedArucoMarkers) { marker in
+                        // Draw marker outline
+                        Path { path in
+                            path.move(to: marker.corners[0])
+                            for i in 1..<4 {
+                                path.addLine(to: marker.corners[i])
+                            }
+                            path.closeSubpath()
+                        }
+                        .stroke(Color.green.opacity(0.8), lineWidth: 3)
+
+                        // Glow effect
+                        Path { path in
+                            path.move(to: marker.corners[0])
+                            for i in 1..<4 {
+                                path.addLine(to: marker.corners[i])
+                            }
+                            path.closeSubpath()
+                        }
+                        .stroke(Color.green.opacity(0.3), lineWidth: 8)
+
+                        // Marker ID label
+                        Text("ID \(marker.markerId)")
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                            .padding(4)
+                            .background(Color.green)
+                            .cornerRadius(4)
+                            .position(marker.center)
+                    }
                 }
             }
             .allowsHitTesting(false)
@@ -434,6 +476,8 @@ struct ManualCaptureView: View {
         detectionTimer?.invalidate()
 
         // Create new timer and store it - runs frequently for smooth point tracking
+        var lastMarkerCheck = Date()
+
         detectionTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { [self] timer in
             guard !isProcessing else { return }
 
@@ -449,6 +493,13 @@ struct ManualCaptureView: View {
                     if !self.cornerWorldPositions.isEmpty {
                         self.updateCornerProjections(frame: frame)
                     }
+
+                    // Check for ArUco markers every 0.5 seconds in automatic mode
+                    if self.captureMode == .automatic && Date().timeIntervalSince(lastMarkerCheck) > 0.5 {
+                        lastMarkerCheck = Date()
+                        self.checkForArucoMarkersLive()
+                    }
+
                     // Frame is released here when it goes out of scope
                 }
             }
@@ -473,6 +524,37 @@ struct ManualCaptureView: View {
         // Update the display positions
         if updatedPoints.count == cornerWorldPositions.count {
             cornerPoints = updatedPoints
+        }
+    }
+
+    private func checkForArucoMarkersLive() {
+        // Get current frame for detection
+        guard let currentFrame = lidarManager.arSession.currentFrame else { return }
+
+        let pixelBuffer = currentFrame.capturedImage
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        let context = CIContext()
+        guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
+        let image = UIImage(cgImage: cgImage)
+
+        // Run marker detection in background to avoid UI lag
+        DispatchQueue.global(qos: .userInitiated).async {
+            let detector = ArucoDetector()
+            let detection = detector.detectMarkers(in: image)
+
+            // Update UI on main thread
+            DispatchQueue.main.async {
+                self.detectionStatus.arucoMarkersDetected = detection.markers.count
+
+                // Update visual markers overlay
+                self.detectedArucoMarkers = detection.markers.map { marker in
+                    DetectedArucoMarker(
+                        markerId: marker.id,
+                        corners: marker.corners,
+                        center: marker.center
+                    )
+                }
+            }
         }
     }
 

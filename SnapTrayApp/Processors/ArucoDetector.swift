@@ -114,22 +114,192 @@ class ArucoDetector {
         return markers
     }
 
+    // Known ArUco 4x4 patterns (Dictionary 50, IDs 0-3)
+    private let arucoPatterns: [[Int]] = [
+        // ID 0
+        [0, 1, 1, 0,
+         1, 0, 1, 1,
+         0, 1, 0, 0,
+         0, 1, 1, 1],
+        // ID 1
+        [1, 0, 0, 1,
+         0, 1, 0, 0,
+         1, 0, 1, 1,
+         1, 1, 0, 0],
+        // ID 2
+        [1, 0, 1, 1,
+         1, 1, 0, 1,
+         0, 1, 0, 0,
+         0, 0, 1, 0],
+        // ID 3
+        [0, 1, 0, 0,
+         1, 1, 1, 0,
+         1, 0, 0, 1,
+         0, 0, 1, 1]
+    ]
+
     private func isLikelyMarker(corners: [CGPoint], cgImage: CGImage) -> Bool {
-        // Check aspect ratio (more lenient)
+        // Quick checks first
         let width = distance(corners[0], corners[1])
         let height = distance(corners[1], corners[2])
         let aspectRatio = width / height
 
-        // Check size - not too small, not too large
+        // Must be square-ish
+        guard aspectRatio > 0.7 && aspectRatio < 1.3 else { return false }
+
+        // Check size
         let area = width * height
         let imageArea = Double(cgImage.width * cgImage.height)
         let relativeArea = area / imageArea
+        guard relativeArea > 0.001 && relativeArea < 0.3 else { return false }
 
-        // Must be square-ish and reasonable size
-        let isSquare = aspectRatio > 0.6 && aspectRatio < 1.4
-        let isReasonableSize = relativeArea > 0.0001 && relativeArea < 0.25
+        // Extract and check pattern
+        guard let markerImage = extractMarkerRegion(corners: corners, from: cgImage, size: 8) else {
+            return false
+        }
 
-        return isSquare && isReasonableSize
+        // Check for black border (ArUco requirement)
+        if !hasBlackBorder(markerImage) {
+            return false
+        }
+
+        // Try to decode inner 4x4 pattern
+        let pattern = decodeInnerPattern(markerImage)
+
+        // Check if pattern matches any known ArUco marker
+        return matchesArucoPattern(pattern)
+    }
+
+    private func extractMarkerRegion(corners: [CGPoint], from cgImage: CGImage, size: Int) -> [[UInt8]]? {
+        // Create a small 8x8 image by sampling the marker region
+        guard let dataProvider = cgImage.dataProvider,
+              let data = dataProvider.data,
+              let bytes = CFDataGetBytePtr(data) else {
+            return nil
+        }
+
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = cgImage.bitsPerPixel / 8
+
+        var grid = [[UInt8]](repeating: [UInt8](repeating: 0, count: size), count: size)
+
+        // Sample points in a grid across the marker
+        for y in 0..<size {
+            for x in 0..<size {
+                // Bilinear interpolation within the quadrilateral
+                let u = Double(x) / Double(size - 1)
+                let v = Double(y) / Double(size - 1)
+
+                // Interpolate position in quadrilateral
+                let top = CGPoint(
+                    x: corners[0].x * (1 - u) + corners[1].x * u,
+                    y: corners[0].y * (1 - u) + corners[1].y * u
+                )
+                let bottom = CGPoint(
+                    x: corners[3].x * (1 - u) + corners[2].x * u,
+                    y: corners[3].y * (1 - u) + corners[2].y * u
+                )
+                let point = CGPoint(
+                    x: top.x * (1 - v) + bottom.x * v,
+                    y: top.y * (1 - v) + bottom.y * v
+                )
+
+                // Sample pixel
+                let px = Int(point.x)
+                let py = Int(point.y)
+
+                if px >= 0 && px < width && py >= 0 && py < height {
+                    let offset = py * width * bytesPerPixel + px * bytesPerPixel
+                    let intensity = bytes[offset]
+                    grid[y][x] = intensity
+                }
+            }
+        }
+
+        return grid
+    }
+
+    private func hasBlackBorder(_ grid: [[UInt8]]) -> Bool {
+        let size = grid.count
+        guard size == 8 else { return false }
+
+        // Check if outer ring is mostly black (< 100)
+        var blackCount = 0
+        var totalCount = 0
+
+        // Top and bottom rows
+        for x in 0..<size {
+            if grid[0][x] < 100 { blackCount += 1 }
+            if grid[size-1][x] < 100 { blackCount += 1 }
+            totalCount += 2
+        }
+
+        // Left and right columns (excluding corners already counted)
+        for y in 1..<(size-1) {
+            if grid[y][0] < 100 { blackCount += 1 }
+            if grid[y][size-1] < 100 { blackCount += 1 }
+            totalCount += 2
+        }
+
+        // At least 70% of border should be black
+        return Double(blackCount) / Double(totalCount) > 0.7
+    }
+
+    private func decodeInnerPattern(_ grid: [[UInt8]]) -> [Int] {
+        // Extract inner 4x4 grid (skip border)
+        var pattern = [Int]()
+
+        for y in 0..<4 {
+            for x in 0..<4 {
+                // Map to grid coordinates (border is cells 0,1 and 6,7; inner is 2-5)
+                let gridY = 2 + y
+                let gridX = 2 + x
+
+                // Average the cell
+                let value = grid[gridY][gridX]
+
+                // Threshold: >128 = white (1), <=128 = black (0)
+                pattern.append(value > 128 ? 1 : 0)
+            }
+        }
+
+        return pattern
+    }
+
+    private func matchesArucoPattern(_ pattern: [Int]) -> Bool {
+        guard pattern.count == 16 else { return false }
+
+        // Check all 4 rotations of the pattern
+        for rotation in 0..<4 {
+            let rotated = rotatePattern(pattern, times: rotation)
+
+            // Check against all known patterns
+            for knownPattern in arucoPatterns {
+                if rotated == knownPattern {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    private func rotatePattern(_ pattern: [Int], times: Int) -> [Int] {
+        var result = pattern
+        for _ in 0..<times {
+            // Rotate 4x4 grid 90 degrees clockwise
+            var rotated = [Int](repeating: 0, count: 16)
+            for y in 0..<4 {
+                for x in 0..<4 {
+                    let oldIdx = y * 4 + x
+                    let newIdx = x * 4 + (3 - y)
+                    rotated[newIdx] = result[oldIdx]
+                }
+            }
+            result = rotated
+        }
+        return result
     }
 
     private func detectCoins(in image: UIImage) -> [(center: CGPoint, radius: Double)] {
