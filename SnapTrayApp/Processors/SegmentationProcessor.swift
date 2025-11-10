@@ -21,7 +21,9 @@ class SegmentationProcessor {
         }
 
         // Step 1: Convert to grayscale
-        let grayImage = convertToGrayscale(cgImage)
+        guard let grayImage = convertToGrayscale(cgImage) else {
+            return SegmentationResult(contours: [], processedImage: nil)
+        }
 
         // Step 2: Apply threshold
         let thresholded = applyAdaptiveThreshold(grayImage)
@@ -52,12 +54,12 @@ class SegmentationProcessor {
         return SegmentationResult(contours: contours, processedImage: processedImage)
     }
 
-    private func convertToGrayscale(_ cgImage: CGImage) -> CGImage {
+    private func convertToGrayscale(_ cgImage: CGImage) -> CGImage? {
         let width = cgImage.width
         let height = cgImage.height
 
         let colorSpace = CGColorSpaceCreateDeviceGray()
-        let context = CGContext(
+        guard let context = CGContext(
             data: nil,
             width: width,
             height: height,
@@ -65,11 +67,13 @@ class SegmentationProcessor {
             bytesPerRow: width,
             space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.none.rawValue
-        )
+        ) else {
+            return nil
+        }
 
-        context?.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-        return context!.makeImage()!
+        return context.makeImage()
     }
 
     private func applyAdaptiveThreshold(_ cgImage: CGImage) -> CGImage {
@@ -240,12 +244,13 @@ class SegmentationProcessor {
     }
 
     private func calculateBoundingBox(points: [CGPoint]) -> CGRect {
-        guard !points.isEmpty else { return .zero }
-
-        let minX = points.map { $0.x }.min()!
-        let maxX = points.map { $0.x }.max()!
-        let minY = points.map { $0.y }.min()!
-        let maxY = points.map { $0.y }.max()!
+        guard !points.isEmpty,
+              let minX = points.map({ $0.x }).min(),
+              let maxX = points.map({ $0.x }).max(),
+              let minY = points.map({ $0.y }).min(),
+              let maxY = points.map({ $0.y }).max() else {
+            return .zero
+        }
 
         return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }

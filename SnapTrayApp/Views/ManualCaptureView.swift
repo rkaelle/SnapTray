@@ -17,7 +17,6 @@ struct ManualCaptureView: View {
     @State private var reticlePosition: CGPoint = .zero
     @State private var screenSize: CGSize = .zero
     @State private var detectionTimer: Timer?
-    @State private var lastARFrame: ARFrame?
 
     enum CaptureMode {
         case manual      // User taps to place corners
@@ -269,7 +268,7 @@ struct ManualCaptureView: View {
 
     private func handleTap(at point: CGPoint) {
         guard captureMode == .manual && cornerPoints.count < 4 else { return }
-        guard let frame = lastARFrame, let plane = lidarManager.detectedPlane else {
+        guard let frame = lidarManager.arSession.currentFrame, let plane = lidarManager.detectedPlane else {
             statusMessage = "Waiting for plane detection..."
             return
         }
@@ -420,11 +419,9 @@ struct ManualCaptureView: View {
         detectionTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { [self] timer in
             guard !isProcessing else { return }
 
-            // Get current AR frame
+            // Get current AR frame - DO NOT STORE IT, just use it immediately
             if let frame = lidarManager.arSession.currentFrame {
                 DispatchQueue.main.async {
-                    self.lastARFrame = frame
-
                     // Update plane detection status
                     self.detectionStatus.planeDetected = self.lidarManager.detectedPlane != nil
                     self.detectionStatus.planeQuality = self.lidarManager.detectedPlane != nil ? "Good" : "No plane"
@@ -434,6 +431,7 @@ struct ManualCaptureView: View {
                     if !self.cornerWorldPositions.isEmpty {
                         self.updateCornerProjections(frame: frame)
                     }
+                    // Frame is released here when it goes out of scope
                 }
             }
         }
@@ -509,7 +507,7 @@ struct ManualCaptureView: View {
 
         if captureMode == .manual && cornerPoints.count == 4 && cornerWorldPositions.count == 4 {
             // Use manual corners - project world positions to final image
-            guard let finalFrame = lastARFrame else {
+            guard let finalFrame = lidarManager.arSession.currentFrame else {
                 statusMessage = "No frame available"
                 isProcessing = false
                 return
@@ -521,6 +519,13 @@ struct ManualCaptureView: View {
                 if let screenPos = projectToScreen(worldPosition: worldPos, frame: finalFrame) {
                     projectedCorners.append(screenPos)
                 }
+            }
+
+            // Ensure we got all 4 corners projected
+            guard projectedCorners.count == 4 else {
+                statusMessage = "Failed to project corners - please try again"
+                isProcessing = false
+                return
             }
 
             // Use projected corners for bounds

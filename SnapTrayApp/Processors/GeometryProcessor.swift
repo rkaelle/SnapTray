@@ -10,13 +10,14 @@ class GeometryProcessor {
 
     // Douglas-Peucker implementation
     private func douglasPeucker(points: [CGPoint], epsilon: Double) -> [CGPoint] {
-        guard points.count > 2 else { return points }
+        guard points.count > 2,
+              let start = points.first,
+              let end = points.last else {
+            return points
+        }
 
         var maxDistance = 0.0
         var maxIndex = 0
-
-        let start = points.first!
-        let end = points.last!
 
         for i in 1..<(points.count - 1) {
             let distance = perpendicularDistance(point: points[i], lineStart: start, lineEnd: end)
