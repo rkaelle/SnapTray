@@ -626,17 +626,21 @@ struct ManualCaptureView: View {
         let floatsPerRow = rowBytes / MemoryLayout<Float32>.stride
 
         var points: [CGPoint] = []
-        let heightThreshold: Float = 0.003  // 3mm above plane
+        let heightThreshold: Float = 0.002  // 2mm above plane (more sensitive)
 
-        // Sample every 8th pixel for performance (still ~1000 points)
-        let stepSize = 8
+        // Sample every 6th pixel for decent coverage
+        let stepSize = 6
+
+        // Simple proportional scale from depth map to screen
+        let scaleX = screenSize.width / CGFloat(depthWidth)
+        let scaleY = screenSize.height / CGFloat(depthHeight)
 
         for y in Swift.stride(from: 0, to: depthHeight, by: stepSize) {
             for x in Swift.stride(from: 0, to: depthWidth, by: stepSize) {
                 let depth = depthPointer[y * floatsPerRow + x]
                 guard depth > 0 && depth < 5.0 else { continue }
 
-                // Convert depth pixel to 3D world position
+                // Convert depth pixel to 3D world position using ARKit
                 let normalizedX = Float(x) / Float(depthWidth - 1)
                 let normalizedY = Float(y) / Float(depthHeight - 1)
 
@@ -654,18 +658,18 @@ struct ManualCaptureView: View {
 
                 // Check if point is above plane
                 let pointToPlane = worldPosition - plane.center
-                let distance = simd_dot(pointToPlane, plane.normal)
+                let distanceAbovePlane = simd_dot(pointToPlane, plane.normal)
 
-                if distance > heightThreshold {
-                    // Project 3D point to screen
-                    if let screenPos = projectToScreen(worldPosition: worldPosition, frame: frame) {
-                        points.append(screenPos)
-                    }
+                if distanceAbovePlane > heightThreshold {
+                    // Simple proportional mapping to screen coordinates
+                    let screenX = CGFloat(x) * scaleX
+                    let screenY = CGFloat(y) * scaleY
+                    points.append(CGPoint(x: screenX, y: screenY))
                 }
             }
         }
 
-        // Limit to reasonable number of points for performance
+        // Limit to reasonable number for performance
         if points.count > 2000 {
             points = Array(points.prefix(2000))
         }
@@ -870,7 +874,7 @@ struct ManualCaptureView: View {
             imageSize: captured.image.size,
             depthMapSize: captured.depthMapSize,  // Use actual depth map size
             workspaceBounds: workspaceBounds,
-            heightThreshold: 0.003  // 3mm above plane (lowered for better detection)
+            heightThreshold: 0.001  // 1mm above plane - VERY sensitive
         )
 
         print("✅ Found \(segmentation.contours.count) contours")

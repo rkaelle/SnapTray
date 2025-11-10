@@ -61,55 +61,41 @@ class SegmentationProcessor {
         workspaceBounds: CGRect?,
         heightThreshold: Float = 0.005 // 5mm above plane
     ) -> SegmentationResult {
-        // OPTIMIZATION: Work with smaller mask for speed, then scale up
+        // SIMPLE APPROACH: Direct proportional mapping
+        // ARKit's sceneDepth is aligned with the camera view, just different resolution
         let workingWidth = 512
         let workingHeight = Int(512 * imageSize.height / imageSize.width)
-
-        // Scale factor from image to working size
-        let scaleToWorking = CGFloat(workingWidth) / imageSize.width
 
         print("🎯 Depth detection setup:")
         print("   Image size: \(imageSize.width)x\(imageSize.height)")
         print("   Working size: \(workingWidth)x\(workingHeight)")
         print("   Depth map: \(depthMapSize.width)x\(depthMapSize.height)")
-        print("   Scale to working: \(scaleToWorking)")
         print("   Height threshold: \(heightThreshold)m")
 
-        // Create small binary mask
         var mask = [UInt8](repeating: 0, count: workingWidth * workingHeight)
-
         var pointsAbovePlane = 0
-        var pointsProjected = 0
 
-        // Mark pixels where depth points are above the plane
+        // Direct proportional scale from depth map to working image
+        let scaleX = CGFloat(workingWidth) / depthMapSize.width
+        let scaleY = CGFloat(workingHeight) / depthMapSize.height
+
+        print("   Scale factors: X=\(scaleX), Y=\(scaleY)")
+
         for point in depthPoints {
             // Calculate distance from point to plane
             let pointToPlane = point.position - plane.center
             let distance = simd_dot(pointToPlane, plane.normal)
 
-            // If point is above plane by threshold, mark it in the mask
             if distance > heightThreshold {
                 pointsAbovePlane += 1
 
-                // Project 3D point to RGB image coordinates using proper camera projection
-                guard let imagePoint = project3DToImage(
-                    worldPoint: point.position,
-                    cameraTransform: cameraTransform,
-                    intrinsics: cameraIntrinsics,
-                    imageSize: imageSize
-                ) else {
-                    continue
-                }
+                // Direct proportional mapping: depth map coords -> working image coords
+                let x = Int(CGFloat(point.pixelX) * scaleX)
+                let y = Int(CGFloat(point.pixelY) * scaleY)
 
-                pointsProjected += 1
-
-                // Scale to working size
-                let x = Int(imagePoint.x * scaleToWorking)
-                let y = Int(imagePoint.y * scaleToWorking)
-
-                // Fill small region (3x3) around point for better connectivity
-                for dy in -1...1 {
-                    for dx in -1...1 {
+                // Fill 5x5 region for better connectivity
+                for dy in -2...2 {
+                    for dx in -2...2 {
                         let px = x + dx
                         let py = y + dy
                         if px >= 0 && px < workingWidth && py >= 0 && py < workingHeight {
@@ -121,13 +107,12 @@ class SegmentationProcessor {
         }
 
         print("   Points above plane: \(pointsAbovePlane) / \(depthPoints.count) (\(Int(Double(pointsAbovePlane)/Double(max(depthPoints.count, 1))*100))%)")
-        print("   Points projected: \(pointsProjected) / \(pointsAbovePlane)")
 
-        // Fast morphological closing (smaller kernel)
-        mask = morphologicalCloseMask(mask, width: workingWidth, height: workingHeight, kernelSize: 5)
+        // Morphological closing with larger kernel to connect fragments
+        mask = morphologicalCloseMask(mask, width: workingWidth, height: workingHeight, kernelSize: 9)
 
-        // Find connected components (simplified)
-        let contours = extractContoursFromMaskFast(mask, width: workingWidth, height: workingHeight, minSize: 20)
+        // Find connected components (very permissive)
+        let contours = extractContoursFromMaskFast(mask, width: workingWidth, height: workingHeight, minSize: 10)
 
         print("   Raw contours found: \(contours.count)")
 
@@ -160,8 +145,8 @@ class SegmentationProcessor {
             print("   After workspace filter: \(filteredContours.count)")
         }
 
-        // Filter by area (remove small noise) - reduced threshold for smaller tools
-        let minAreaPixels = 500.0
+        // Filter by area (remove small noise) - very permissive threshold
+        let minAreaPixels = 200.0
         filteredContours = filteredContours.filter { $0.area > minAreaPixels }
         print("   After area filter (min \(minAreaPixels)): \(filteredContours.count)")
 
