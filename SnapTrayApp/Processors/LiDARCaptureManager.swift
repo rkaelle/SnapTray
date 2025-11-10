@@ -304,13 +304,17 @@ extension LiDARCaptureManager: ARSessionDelegate {
         }
 
         // Convert ARPlaneAnchor to DetectedPlane
-        let normal = simd_float3(0, 1, 0) // Horizontal plane always has upward normal
-        let center = simd_float3(largestPlane.center)
         let transform = largestPlane.transform
+
+        // Extract world-space position from transform matrix
+        let worldCenter = simd_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+
+        // Horizontal plane normal always points up in world space
+        let normal = simd_float3(0, 1, 0)
 
         let plane = DetectedPlane(
             normal: normal,
-            center: center,
+            center: worldCenter,
             transform: transform,
             inlierCount: Int(largestPlane.planeExtent.width * largestPlane.planeExtent.height * 1000) // Approximate confidence
         )
