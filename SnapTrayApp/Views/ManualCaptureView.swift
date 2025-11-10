@@ -660,14 +660,14 @@ struct ARCameraViewWithHitTest: UIViewRepresentable {
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
         arView.addGestureRecognizer(tapGesture)
 
-        // Configure plane visualization
-        let planeSize: CGFloat = 1.2
+        // Configure plane visualization (larger and more visible)
+        let planeSize: CGFloat = 2.0  // Larger plane for better visibility
         let grid = SCNPlane(width: planeSize, height: planeSize)
         let material = SCNMaterial()
-        material.diffuse.contents = makeGridImage(size: CGSize(width: 256, height: 256), gridSize: 16)
+        material.diffuse.contents = makeGridImage(size: CGSize(width: 512, height: 512), gridSize: 32)
         material.isDoubleSided = true
-        material.transparency = 0.6
-        material.lightingModel = .physicallyBased
+        material.transparency = 0.75  // More visible
+        material.lightingModel = .constant  // Always visible regardless of lighting
         grid.firstMaterial = material
 
         let coord = context.coordinator
@@ -720,14 +720,14 @@ struct ARCameraViewWithHitTest: UIViewRepresentable {
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { ctx in
             let context = ctx.cgContext
-            context.setFillColor(UIColor.clear.cgColor)
+
+            // Semi-transparent blue background for better visibility
+            context.setFillColor(UIColor(red: 0.0, green: 0.5, blue: 1.0, alpha: 0.15).cgColor)
             context.fill(CGRect(origin: .zero, size: size))
 
-            context.setFillColor(UIColor(white: 1.0, alpha: 0.06).cgColor)
-            context.fill(CGRect(origin: .zero, size: size))
-
-            context.setStrokeColor(UIColor(white: 1.0, alpha: 0.25).cgColor)
-            context.setLineWidth(1)
+            // Grid lines - brighter and more visible
+            context.setStrokeColor(UIColor(white: 1.0, alpha: 0.5).cgColor)
+            context.setLineWidth(2)
 
             for x in stride(from: 0.0, through: size.width, by: gridSize) {
                 context.move(to: CGPoint(x: x, y: 0))
@@ -739,8 +739,9 @@ struct ARCameraViewWithHitTest: UIViewRepresentable {
             }
             context.strokePath()
 
-            context.setStrokeColor(UIColor(white: 1.0, alpha: 0.45).cgColor)
-            context.setLineWidth(1.5)
+            // Center crosshair - more prominent
+            context.setStrokeColor(UIColor(red: 0.0, green: 0.8, blue: 1.0, alpha: 0.8).cgColor)
+            context.setLineWidth(3)
             context.move(to: CGPoint(x: size.width/2, y: 0))
             context.addLine(to: CGPoint(x: size.width/2, y: size.height))
             context.move(to: CGPoint(x: 0, y: size.height/2))

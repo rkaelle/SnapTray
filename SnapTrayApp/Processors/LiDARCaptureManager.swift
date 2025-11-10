@@ -49,6 +49,10 @@ class LiDARCaptureManager: NSObject, ObservableObject {
         configuration.sceneReconstruction = .mesh
         configuration.frameSemantics = .sceneDepth
 
+        // Enable horizontal plane detection (like Apple Measure app)
+        configuration.planeDetection = [.horizontal]
+        configuration.environmentTexturing = .automatic
+
         DispatchQueue.main.async {
             self.arSession.delegate = self
             self.arSession.run(configuration, options: [.resetTracking, .removeExistingAnchors])
@@ -280,5 +284,39 @@ class LiDARCaptureManager: NSObject, ObservableObject {
 extension LiDARCaptureManager: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         // Do not retain frames. If future live processing is needed, throttle it here without storing ARFrame.
+    }
+
+    func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
+        updateDetectedPlane(from: anchors)
+    }
+
+    func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
+        updateDetectedPlane(from: anchors)
+    }
+
+    private func updateDetectedPlane(from anchors: [ARAnchor]) {
+        // Find the largest horizontal plane (most confident detection)
+        let planeAnchors = anchors.compactMap { $0 as? ARPlaneAnchor }
+            .filter { $0.alignment == .horizontal }
+
+        guard let largestPlane = planeAnchors.max(by: { $0.planeExtent.width * $0.planeExtent.height < $1.planeExtent.width * $1.planeExtent.height }) else {
+            return
+        }
+
+        // Convert ARPlaneAnchor to DetectedPlane
+        let normal = simd_float3(0, 1, 0) // Horizontal plane always has upward normal
+        let center = simd_float3(largestPlane.center)
+        let transform = largestPlane.transform
+
+        let plane = DetectedPlane(
+            normal: normal,
+            center: center,
+            transform: transform,
+            inlierCount: Int(largestPlane.planeExtent.width * largestPlane.planeExtent.height * 1000) // Approximate confidence
+        )
+
+        DispatchQueue.main.async {
+            self.detectedPlane = plane
+        }
     }
 }
