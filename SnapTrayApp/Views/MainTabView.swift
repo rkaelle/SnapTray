@@ -143,9 +143,17 @@ struct HomeView: View {
             .navigationTitle("SnapTray")
             .sheet(isPresented: $showingCapture) {
                 ManualCaptureView(onCaptureDone: { project in
-                    showingCapture = false
+                    // Add project to appState before navigating
+                    appState.projects.append(project)
                     currentProject = project
-                    navigationPath.append(.confirm(project))
+
+                    // Dismiss sheet first
+                    showingCapture = false
+
+                    // Wait for sheet to dismiss and AR session to stop before navigating
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        navigationPath.append(.confirm(project))
+                    }
                 }, onCancel: {
                     showingCapture = false
                 })
