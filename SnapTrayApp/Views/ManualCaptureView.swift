@@ -10,6 +10,7 @@ struct ManualCaptureView: View {
     @State private var captureMode: CaptureMode = .manual
     @State private var cornerPoints: [CGPoint] = []  // 2D screen positions (for display)
     @State private var cornerWorldPositions: [simd_float3] = []  // 3D world positions (for accuracy)
+    @State private var cornerScales: [CGFloat] = []  // Scale factors based on distance
     @State private var isProcessing = false
     @State private var statusMessage = "Position camera 60-100cm above tools"
     @State private var showGuide = true
@@ -64,7 +65,8 @@ struct ManualCaptureView: View {
             // Corner markers overlay
             GeometryReader { geometry in
                 ForEach(Array(cornerPoints.enumerated()), id: \.offset) { index, point in
-                    CornerMarker(number: index + 1, isComplete: cornerPoints.count == 4)
+                    let scale = index < cornerScales.count ? cornerScales[index] : 1.0
+                    CornerMarker(number: index + 1, isComplete: cornerPoints.count == 4, scale: scale)
                         .position(point)
                 }
 
@@ -85,6 +87,14 @@ struct ManualCaptureView: View {
                 // ArUco markers overlay (in automatic mode)
                 if captureMode == .automatic {
                     ForEach(detectedArucoMarkers) { marker in
+                        // Calculate scale based on marker size (diagonal length)
+                        let dx = marker.corners[2].x - marker.corners[0].x
+                        let dy = marker.corners[2].y - marker.corners[0].y
+                        let markerSize = sqrt(dx * dx + dy * dy)
+                        let referenceSize: CGFloat = 200  // Reference marker size
+                        let scale = markerSize / referenceSize
+                        let clampedScale = min(max(scale, 0.5), 2.0)
+
                         // Draw marker outline
                         Path { path in
                             path.move(to: marker.corners[0])
@@ -93,7 +103,7 @@ struct ManualCaptureView: View {
                             }
                             path.closeSubpath()
                         }
-                        .stroke(Color.green.opacity(0.8), lineWidth: 3)
+                        .stroke(Color.green.opacity(0.8), lineWidth: 3 * clampedScale)
 
                         // Glow effect
                         Path { path in
@@ -103,13 +113,13 @@ struct ManualCaptureView: View {
                             }
                             path.closeSubpath()
                         }
-                        .stroke(Color.green.opacity(0.3), lineWidth: 8)
+                        .stroke(Color.green.opacity(0.3), lineWidth: 8 * clampedScale)
 
                         // Marker ID label
                         Text("ID \(marker.markerId)")
-                            .font(.caption.bold())
+                            .font(.system(size: 12 * clampedScale, weight: .bold))
                             .foregroundColor(.white)
-                            .padding(4)
+                            .padding(4 * clampedScale)
                             .background(Color.green)
                             .cornerRadius(4)
                             .position(marker.center)
@@ -294,6 +304,7 @@ struct ManualCaptureView: View {
         captureMode = captureMode == .manual ? .automatic : .manual
         cornerPoints.removeAll()
         cornerWorldPositions.removeAll()
+        cornerScales.removeAll()
         statusMessage = captureMode == .manual
             ? "Tap to place 4 corner points"
             : "Positioning camera to detect ArUco markers"
@@ -336,6 +347,18 @@ struct ManualCaptureView: View {
                 // Fallback to center if projection fails
                 cornerPoints.append(centerPoint)
             }
+
+            // Calculate initial distance-based scale
+            let cameraPosition = simd_float3(
+                frame.camera.transform.columns.3.x,
+                frame.camera.transform.columns.3.y,
+                frame.camera.transform.columns.3.z
+            )
+            let distance = simd_distance(cameraPosition, worldPosition)
+            let referenceDistance: Float = 0.8  // 80cm reference
+            let scale = CGFloat(referenceDistance / distance)
+            let clampedScale = min(max(scale, 0.5), 2.0)
+            cornerScales.append(clampedScale)
 
             // Haptic feedback
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -447,6 +470,7 @@ struct ManualCaptureView: View {
         guard !cornerPoints.isEmpty else { return }
         cornerPoints.removeLast()
         cornerWorldPositions.removeLast()
+        cornerScales.removeLast()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         statusMessage = cornerPoints.isEmpty
@@ -457,6 +481,7 @@ struct ManualCaptureView: View {
     private func resetCorners() {
         cornerPoints.removeAll()
         cornerWorldPositions.removeAll()
+        cornerScales.removeAll()
         statusMessage = "Tap to place first corner"
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
     }
@@ -509,21 +534,37 @@ struct ManualCaptureView: View {
     private func updateCornerProjections(frame: ARFrame) {
         // Re-project all 3D world positions to current screen coordinates
         var updatedPoints: [CGPoint] = []
+        var updatedScales: [CGFloat] = []
+
+        let cameraPosition = simd_float3(
+            frame.camera.transform.columns.3.x,
+            frame.camera.transform.columns.3.y,
+            frame.camera.transform.columns.3.z
+        )
 
         for worldPos in cornerWorldPositions {
             if let screenPos = projectToScreen(worldPosition: worldPos, frame: frame) {
                 updatedPoints.append(screenPos)
+
+                // Calculate distance-based scale
+                let distance = simd_distance(cameraPosition, worldPos)
+                let referenceDistance: Float = 0.8  // 80cm reference
+                let scale = CGFloat(referenceDistance / distance)
+                let clampedScale = min(max(scale, 0.5), 2.0)  // Clamp between 0.5x and 2.0x
+                updatedScales.append(clampedScale)
             } else {
                 // Keep old position if projection fails
                 if updatedPoints.count < cornerPoints.count {
                     updatedPoints.append(cornerPoints[updatedPoints.count])
+                    updatedScales.append(1.0)  // Default scale
                 }
             }
         }
 
-        // Update the display positions
+        // Update the display positions and scales
         if updatedPoints.count == cornerWorldPositions.count {
             cornerPoints = updatedPoints
+            cornerScales = updatedScales
         }
     }
 
@@ -672,23 +713,47 @@ struct ManualCaptureView: View {
             pixelToMMScale = detection.pixelToMMScale ?? 1.0
         }
 
+        // Validate phone angle (should be parallel to plane)
+        let cameraTransform = captured.cameraTransform
+        let cameraForward = simd_float3(cameraTransform.columns.2.x, cameraTransform.columns.2.y, cameraTransform.columns.2.z)
+        let angleToPlane = acos(abs(simd_dot(cameraForward, plane.normal)))
+        let angleDegrees = angleToPlane * 180.0 / .pi
+
+        print("📐 Camera angle to plane: \(angleDegrees)°")
+
+        if angleDegrees > 30 {
+            DispatchQueue.main.async {
+                self.statusMessage = "⚠️ Hold phone more parallel to surface"
+                self.isProcessing = false
+            }
+            return
+        }
+
         // Segment tools using DEPTH DATA (not image processing!)
         DispatchQueue.main.async {
             self.statusMessage = "Detecting tools from depth..."
         }
 
+        print("🔍 Starting tool detection...")
+        print("   Depth points: \(captured.depthData.count)")
+        print("   Depth map size: \(captured.depthMapSize)")
+        print("   Image size: \(captured.image.size)")
+
         let segmenter = SegmentationProcessor()
 
         // Use depth-based segmentation - finds objects above the plane
-        let depthMapSize = CGSize(width: 256, height: 192)  // Typical depth map size
         let segmentation = segmenter.segmentToolsFromDepth(
             depthPoints: captured.depthData,
             plane: plane,
+            cameraTransform: captured.cameraTransform,
+            cameraIntrinsics: captured.cameraIntrinsics,
             imageSize: captured.image.size,
-            depthMapSize: depthMapSize,
+            depthMapSize: captured.depthMapSize,  // Use actual depth map size
             workspaceBounds: workspaceBounds,
-            heightThreshold: 0.005  // 5mm above plane
+            heightThreshold: 0.003  // 3mm above plane (lowered for better detection)
         )
+
+        print("✅ Found \(segmentation.contours.count) contours")
 
         let scaledContours = segmentation.contours
 
@@ -813,20 +878,25 @@ struct Reticle: View {
 struct CornerMarker: View {
     let number: Int
     let isComplete: Bool
+    let scale: CGFloat  // Distance-based scale factor
 
     var body: some View {
+        let size = 50 * scale
+        let strokeWidth = 3 * scale
+        let fontSize = 20 * scale
+
         ZStack {
             Circle()
                 .fill(isComplete ? Color.green : Color.blue)
-                .frame(width: 50, height: 50)
-                .shadow(color: .black.opacity(0.5), radius: 5)
+                .frame(width: size, height: size)
+                .shadow(color: .black.opacity(0.5), radius: 5 * scale)
 
             Circle()
-                .stroke(Color.white, lineWidth: 3)
-                .frame(width: 50, height: 50)
+                .stroke(Color.white, lineWidth: strokeWidth)
+                .frame(width: size, height: size)
 
             Text("\(number)")
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: fontSize, weight: .bold))
                 .foregroundColor(.white)
         }
     }

@@ -2,6 +2,7 @@ import UIKit
 import Vision
 import CoreImage
 import Accelerate
+import simd
 
 class SegmentationProcessor {
     struct SegmentationResult {
@@ -18,10 +19,43 @@ class SegmentationProcessor {
     // Reuse CIContext to save memory
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
+    // Project 3D world point to 2D image coordinates using camera projection
+    private func project3DToImage(
+        worldPoint: simd_float3,
+        cameraTransform: matrix_float4x4,
+        intrinsics: matrix_float3x3,
+        imageSize: CGSize
+    ) -> CGPoint? {
+        // Transform to camera space
+        let viewMatrix = simd_inverse(cameraTransform)
+        let pointInCamera = viewMatrix * simd_float4(worldPoint, 1.0)
+
+        // Check if behind camera
+        if pointInCamera.z >= 0 { return nil }
+
+        // Project to normalized coordinates
+        let x = pointInCamera.x / -pointInCamera.z
+        let y = pointInCamera.y / -pointInCamera.z
+
+        // Apply intrinsics to get pixel coordinates
+        let pixelX = x * intrinsics[0][0] + intrinsics[2][0]
+        let pixelY = y * intrinsics[1][1] + intrinsics[2][1]
+
+        // Check bounds
+        if pixelX < 0 || pixelX >= Float(imageSize.width) ||
+           pixelY < 0 || pixelY >= Float(imageSize.height) {
+            return nil
+        }
+
+        return CGPoint(x: CGFloat(pixelX), y: CGFloat(pixelY))
+    }
+
     // FAST: Use depth data to find tools above the plane
     func segmentToolsFromDepth(
         depthPoints: [LiDARCaptureManager.DepthPoint],
         plane: LiDARCaptureManager.DetectedPlane,
+        cameraTransform: matrix_float4x4,
+        cameraIntrinsics: matrix_float3x3,
         imageSize: CGSize,
         depthMapSize: CGSize,
         workspaceBounds: CGRect?,
@@ -31,12 +65,21 @@ class SegmentationProcessor {
         let workingWidth = 512
         let workingHeight = Int(512 * imageSize.height / imageSize.width)
 
-        // Scale factors
+        // Scale factor from image to working size
         let scaleToWorking = CGFloat(workingWidth) / imageSize.width
-        let scaleFromDepth = CGFloat(workingWidth) / depthMapSize.width
+
+        print("🎯 Depth detection setup:")
+        print("   Image size: \(imageSize.width)x\(imageSize.height)")
+        print("   Working size: \(workingWidth)x\(workingHeight)")
+        print("   Depth map: \(depthMapSize.width)x\(depthMapSize.height)")
+        print("   Scale to working: \(scaleToWorking)")
+        print("   Height threshold: \(heightThreshold)m")
 
         // Create small binary mask
         var mask = [UInt8](repeating: 0, count: workingWidth * workingHeight)
+
+        var pointsAbovePlane = 0
+        var pointsProjected = 0
 
         // Mark pixels where depth points are above the plane
         for point in depthPoints {
@@ -46,11 +89,25 @@ class SegmentationProcessor {
 
             // If point is above plane by threshold, mark it in the mask
             if distance > heightThreshold {
-                // Scale depth coordinates to working size
-                let x = Int(CGFloat(point.pixelX) * scaleFromDepth)
-                let y = Int(CGFloat(point.pixelY) * scaleFromDepth)
+                pointsAbovePlane += 1
 
-                // Fill small region (3x3) around point
+                // Project 3D point to RGB image coordinates using proper camera projection
+                guard let imagePoint = project3DToImage(
+                    worldPoint: point.position,
+                    cameraTransform: cameraTransform,
+                    intrinsics: cameraIntrinsics,
+                    imageSize: imageSize
+                ) else {
+                    continue
+                }
+
+                pointsProjected += 1
+
+                // Scale to working size
+                let x = Int(imagePoint.x * scaleToWorking)
+                let y = Int(imagePoint.y * scaleToWorking)
+
+                // Fill small region (3x3) around point for better connectivity
                 for dy in -1...1 {
                     for dx in -1...1 {
                         let px = x + dx
@@ -63,11 +120,16 @@ class SegmentationProcessor {
             }
         }
 
+        print("   Points above plane: \(pointsAbovePlane) / \(depthPoints.count) (\(Int(Double(pointsAbovePlane)/Double(max(depthPoints.count, 1))*100))%)")
+        print("   Points projected: \(pointsProjected) / \(pointsAbovePlane)")
+
         // Fast morphological closing (smaller kernel)
         mask = morphologicalCloseMask(mask, width: workingWidth, height: workingHeight, kernelSize: 5)
 
         // Find connected components (simplified)
-        let contours = extractContoursFromMaskFast(mask, width: workingWidth, height: workingHeight, minSize: 50)
+        let contours = extractContoursFromMaskFast(mask, width: workingWidth, height: workingHeight, minSize: 20)
+
+        print("   Raw contours found: \(contours.count)")
 
         // Scale contours back to original size
         let scaleUp = imageSize.width / CGFloat(workingWidth)
@@ -84,15 +146,19 @@ class SegmentationProcessor {
             scaledContours.append(Contour(points: scaledPoints, area: area, boundingBox: bbox))
         }
 
+        print("   After scaling: \(scaledContours.count)")
+
         // Filter by workspace bounds
         var filteredContours = scaledContours
         if let bounds = workspaceBounds {
             filteredContours = scaledContours.filter { isContourInBounds($0, bounds: bounds) }
+            print("   After workspace filter: \(filteredContours.count)")
         }
 
-        // Filter by area (remove small noise)
-        let minAreaPixels = 1000.0
+        // Filter by area (remove small noise) - reduced threshold for smaller tools
+        let minAreaPixels = 500.0
         filteredContours = filteredContours.filter { $0.area > minAreaPixels }
+        print("   After area filter (min \(minAreaPixels)): \(filteredContours.count)")
 
         let processedImage = visualizeContours(contours: filteredContours, imageSize: imageSize)
 

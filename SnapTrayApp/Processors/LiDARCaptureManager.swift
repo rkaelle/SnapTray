@@ -16,7 +16,9 @@ class LiDARCaptureManager: NSObject, ObservableObject {
         let image: UIImage
         let depthData: [DepthPoint]
         let cameraTransform: matrix_float4x4
+        let cameraIntrinsics: matrix_float3x3  // Camera intrinsics for projection
         let timestamp: TimeInterval
+        let depthMapSize: CGSize  // Actual depth map dimensions
     }
 
     struct DepthPoint {
@@ -81,16 +83,26 @@ class LiDARCaptureManager: NSObject, ObservableObject {
 
         // Extract depth data
         var depthPoints: [DepthPoint] = []
+        var depthMapSize = CGSize(width: 256, height: 192)  // Default fallback
+
         if let depthMap = frame.sceneDepth?.depthMap,
            let confidenceMap = frame.sceneDepth?.confidenceMap {
+            depthMapSize = CGSize(
+                width: CVPixelBufferGetWidth(depthMap),
+                height: CVPixelBufferGetHeight(depthMap)
+            )
             depthPoints = extractDepthPoints(from: depthMap, confidence: confidenceMap, frame: frame)
+
+            print("📊 Depth map size: \(depthMapSize.width)x\(depthMapSize.height), Points: \(depthPoints.count)")
         }
 
         let captured = CapturedFrame(
             image: image,
             depthData: depthPoints,
             cameraTransform: frame.camera.transform,
-            timestamp: frame.timestamp
+            cameraIntrinsics: frame.camera.intrinsics,
+            timestamp: frame.timestamp,
+            depthMapSize: depthMapSize
         )
 
         DispatchQueue.main.async {
