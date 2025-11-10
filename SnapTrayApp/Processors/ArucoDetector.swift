@@ -65,10 +65,11 @@ class ArucoDetector {
 
         // For ArUco, we'll use a custom approach with rectangle detection
         let rectangleRequest = VNDetectRectanglesRequest()
-        rectangleRequest.minimumAspectRatio = 0.8
-        rectangleRequest.maximumAspectRatio = 1.2
-        rectangleRequest.minimumSize = 0.05
-        rectangleRequest.maximumObservations = 20
+        rectangleRequest.minimumAspectRatio = 0.7  // More lenient
+        rectangleRequest.maximumAspectRatio = 1.3  // More lenient
+        rectangleRequest.minimumSize = 0.02  // Detect smaller rectangles
+        rectangleRequest.minimumConfidence = 0.4  // Lower confidence threshold
+        rectangleRequest.maximumObservations = 30  // Check more rectangles
 
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
 
@@ -114,12 +115,21 @@ class ArucoDetector {
     }
 
     private func isLikelyMarker(corners: [CGPoint], cgImage: CGImage) -> Bool {
-        // Check aspect ratio
+        // Check aspect ratio (more lenient)
         let width = distance(corners[0], corners[1])
         let height = distance(corners[1], corners[2])
         let aspectRatio = width / height
 
-        return aspectRatio > 0.8 && aspectRatio < 1.2
+        // Check size - not too small, not too large
+        let area = width * height
+        let imageArea = Double(cgImage.width * cgImage.height)
+        let relativeArea = area / imageArea
+
+        // Must be square-ish and reasonable size
+        let isSquare = aspectRatio > 0.6 && aspectRatio < 1.4
+        let isReasonableSize = relativeArea > 0.0001 && relativeArea < 0.25
+
+        return isSquare && isReasonableSize
     }
 
     private func detectCoins(in image: UIImage) -> [(center: CGPoint, radius: Double)] {

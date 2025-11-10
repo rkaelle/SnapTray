@@ -15,6 +15,7 @@ struct ManualCaptureView: View {
     @State private var detectionStatus = DetectionStatus()
     @State private var reticlePosition: CGPoint = .zero
     @State private var screenSize: CGSize = .zero
+    @State private var detectionTimer: Timer?
 
     enum CaptureMode {
         case manual      // User taps to place corners
@@ -214,6 +215,8 @@ struct ManualCaptureView: View {
             startDetectionMonitoring()
         }
         .onDisappear {
+            detectionTimer?.invalidate()
+            detectionTimer = nil
             lidarManager.stopSession()
         }
     }
@@ -234,8 +237,12 @@ struct ManualCaptureView: View {
 
     private var canCapture: Bool {
         if captureMode == .manual {
-            return cornerPoints.count == 4 && detectionStatus.planeDetected
+            // In manual mode:
+            // - Always allow placing corners (< 4 corners)
+            // - Only require plane detection when ready to capture (== 4 corners)
+            return cornerPoints.count < 4 || detectionStatus.planeDetected
         } else {
+            // In automatic mode, need both plane and markers
             return detectionStatus.planeDetected && detectionStatus.arucoMarkersDetected >= 4
         }
     }
@@ -247,6 +254,14 @@ struct ManualCaptureView: View {
             ? "Tap to place 4 corner points"
             : "Positioning camera to detect ArUco markers"
         showGuide = true
+
+        // If switching to auto mode, check for markers once
+        if captureMode == .automatic {
+            checkForArucoMarkers()
+        } else {
+            // Reset marker count in manual mode
+            detectionStatus.arucoMarkersDetected = 0
+        }
     }
 
     private func handleTap(at point: CGPoint) {
@@ -301,21 +316,42 @@ struct ManualCaptureView: View {
     }
 
     private func startDetectionMonitoring() {
-        Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+        // Invalidate any existing timer
+        detectionTimer?.invalidate()
+
+        // Create new timer and store it - runs every 0.5 seconds for plane detection
+        detectionTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [self] timer in
             guard !isProcessing else { return }
 
-            // Update plane detection status
-            detectionStatus.planeDetected = lidarManager.detectedPlane != nil
-            detectionStatus.planeQuality = lidarManager.detectedPlane != nil ? "Good" : "No plane"
+            // Update plane detection status (lightweight check)
+            DispatchQueue.main.async {
+                detectionStatus.planeDetected = lidarManager.detectedPlane != nil
+                detectionStatus.planeQuality = lidarManager.detectedPlane != nil ? "Good" : "No plane"
+                detectionStatus.lastUpdate = Date()
+            }
+        }
+    }
 
-            // Check for ArUco markers if in automatic mode
-            if captureMode == .automatic, let captured = lidarManager.capturedFrame {
+    private func checkForArucoMarkers() {
+        // Only check in auto mode
+        guard captureMode == .automatic else { return }
+
+        // Capture a frame to check for markers
+        lidarManager.captureFrame()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard let captured = self.lidarManager.capturedFrame else { return }
+
+            // Run marker detection in background to avoid UI lag
+            DispatchQueue.global(qos: .userInitiated).async {
                 let detector = ArucoDetector()
                 let detection = detector.detectMarkers(in: captured.image)
-                detectionStatus.arucoMarkersDetected = detection.markers.count
-            }
 
-            detectionStatus.lastUpdate = Date()
+                // Update UI on main thread
+                DispatchQueue.main.async {
+                    self.detectionStatus.arucoMarkersDetected = detection.markers.count
+                }
+            }
         }
     }
 
