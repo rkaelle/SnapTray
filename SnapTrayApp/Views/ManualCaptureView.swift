@@ -672,7 +672,12 @@ struct ManualCaptureView: View {
             }
         }
 
-        var project = Project(name: "Tray \(Date().formatted(date: .numeric, time: .omitted))")
+        // Use filename-safe date format (no slashes)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: Date())
+
+        var project = Project(name: "Tray \(dateString)")
         project.tools = tools
         project.workspaceBounds = workspaceBounds
         project.pixelToMMScale = pixelToMMScale

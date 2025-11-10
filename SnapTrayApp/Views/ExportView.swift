@@ -205,6 +205,21 @@ struct ExportView: View {
         }
     }
 
+    // Helper to sanitize filenames by removing invalid characters
+    private func sanitizeFilename(_ name: String) -> String {
+        return name
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: "\\", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .replacingOccurrences(of: "*", with: "-")
+            .replacingOccurrences(of: "?", with: "-")
+            .replacingOccurrences(of: "\"", with: "-")
+            .replacingOccurrences(of: "<", with: "-")
+            .replacingOccurrences(of: ">", with: "-")
+            .replacingOccurrences(of: "|", with: "-")
+            .replacingOccurrences(of: " ", with: "_")
+    }
+
     private func exportDXF() {
         exportStatus = .exporting
 
@@ -213,7 +228,7 @@ struct ExportView: View {
             let scale = project.pixelToMMScale ?? 1.0
             let dxf = exporter.exportProject(project, scale: scale)
 
-            let filename = "\(project.name.replacingOccurrences(of: " ", with: "_"))_pockets.dxf"
+            let filename = "\(sanitizeFilename(project.name))_pockets.dxf"
 
             if let url = exporter.saveToFile(dxf, filename: filename) {
                 DispatchQueue.main.async {
@@ -236,7 +251,7 @@ struct ExportView: View {
             let scale = project.pixelToMMScale ?? 1.0
 
             if let stlData = exporter.exportProject(project, scale: scale) {
-                let filename = "\(project.name.replacingOccurrences(of: " ", with: "_"))_tray.stl"
+                let filename = "\(sanitizeFilename(project.name))_tray.stl"
 
                 if let url = exporter.saveToFile(stlData, filename: filename) {
                     DispatchQueue.main.async {
@@ -265,7 +280,7 @@ struct ExportView: View {
             let capturedImage = project.capturedImage.flatMap { UIImage(data: $0) }
 
             if let pdfData = exporter.generatePrintablePDF(project: project, capturedImage: capturedImage) {
-                let filename = "\(project.name.replacingOccurrences(of: " ", with: "_"))_report.pdf"
+                let filename = "\(sanitizeFilename(project.name))_report.pdf"
 
                 if let url = exporter.saveToFile(pdfData, filename: filename) {
                     DispatchQueue.main.async {
