@@ -20,11 +20,12 @@ class SegmentationProcessor {
 
     // FAST: Use depth data to find tools above the plane
     func segmentToolsFromDepth(
-        imageSize: CGSize,
         depthPoints: [LiDARCaptureManager.DepthPoint],
         plane: LiDARCaptureManager.DetectedPlane,
+        imageSize: CGSize,
+        depthMapSize: CGSize,
         workspaceBounds: CGRect?,
-        heightThreshold: Float = 0.003 // 3mm above plane
+        heightThreshold: Float = 0.005 // 5mm above plane
     ) -> SegmentationResult {
         let width = Int(imageSize.width)
         let height = Int(imageSize.height)
@@ -32,27 +33,114 @@ class SegmentationProcessor {
         // Create binary mask of points above plane
         var mask = [UInt8](repeating: 0, count: width * height)
 
+        // Calculate scale from depth map to image
+        let scaleX = imageSize.width / depthMapSize.width
+        let scaleY = imageSize.height / depthMapSize.height
+
+        // Mark pixels where depth points are above the plane
         for point in depthPoints {
             // Calculate distance from point to plane
             let pointToPlane = point.position - plane.center
             let distance = simd_dot(pointToPlane, plane.normal)
 
-            // If point is above plane by threshold, mark it
-            if distance > heightThreshold && point.confidence != .low {
-                // Project 3D point to 2D image coordinates
-                // For now, use simple orthographic projection
-                // (This assumes depth points already have image coordinates)
-                // In practice, we'd use the camera intrinsics from ARFrame
+            // If point is above plane by threshold, mark it in the mask
+            if distance > heightThreshold {
+                // Scale depth map coordinates to image size
+                let imgX = Int(CGFloat(point.pixelX) * scaleX)
+                let imgY = Int(CGFloat(point.pixelY) * scaleY)
 
-                // Since depth points are extracted from the depth map, they already
-                // correspond to image pixels. We'll mark the mask directly.
-                // Note: This is a simplified version - ideally we'd track the original pixel coordinates
+                // Fill a region around this point to account for sampling
+                let radius = max(Int(scaleX), Int(scaleY)) + 2
+                for dy in -radius...radius {
+                    for dx in -radius...radius {
+                        let px = imgX + dx
+                        let py = imgY + dy
+                        if px >= 0 && px < width && py >= 0 && py < height {
+                            mask[py * width + px] = 255
+                        }
+                    }
+                }
             }
         }
 
-        // For now, fall back to the old method but make it faster
-        // We'll optimize this in the next iteration
-        return SegmentationResult(contours: [], processedImage: nil)
+        // Apply morphological closing to connect nearby regions
+        mask = morphologicalCloseMask(mask, width: width, height: height, kernelSize: 9)
+
+        // Find connected components
+        let contours = extractContoursFromMask(mask, width: width, height: height)
+
+        // Filter by workspace bounds
+        var filteredContours = contours
+        if let bounds = workspaceBounds {
+            filteredContours = contours.filter { isContourInBounds($0, bounds: bounds) }
+        }
+
+        // Filter by area (remove small noise)
+        let minAreaPixels = 1000.0  // Minimum area for a tool
+        filteredContours = filteredContours.filter { $0.area > minAreaPixels }
+
+        let processedImage = visualizeContours(contours: filteredContours, imageSize: imageSize)
+
+        return SegmentationResult(contours: filteredContours, processedImage: processedImage)
+    }
+
+    // Helper: Morphological closing on mask
+    private func morphologicalCloseMask(_ input: [UInt8], width: Int, height: Int, kernelSize: Int) -> [UInt8] {
+        // Dilate
+        var dilated = morphologicalOperation(input, width: width, height: height, kernelSize: kernelSize, isDilation: true)
+        // Erode
+        return morphologicalOperation(dilated, width: width, height: height, kernelSize: kernelSize, isDilation: false)
+    }
+
+    // Helper: Extract contours from binary mask using connected components
+    private func extractContoursFromMask(_ mask: [UInt8], width: Int, height: Int) -> [Contour] {
+        var labeled = [Int](repeating: 0, count: width * height)
+        var nextLabel = 1
+        var contours: [Contour] = []
+
+        // Connected components labeling (simple flood fill)
+        for y in 0..<height {
+            for x in 0..<width {
+                let idx = y * width + x
+                if mask[idx] > 128 && labeled[idx] == 0 {
+                    // Start new component
+                    var componentPoints: [CGPoint] = []
+                    floodFill(mask: mask, labeled: &labeled, x: x, y: y, width: width, height: height, label: nextLabel, points: &componentPoints)
+
+                    if componentPoints.count > 10 {  // Minimum points
+                        let area = calculateArea(points: componentPoints)
+                        let boundingBox = calculateBoundingBox(points: componentPoints)
+                        contours.append(Contour(points: componentPoints, area: area, boundingBox: boundingBox))
+                    }
+
+                    nextLabel += 1
+                }
+            }
+        }
+
+        return contours
+    }
+
+    // Helper: Flood fill for connected components
+    private func floodFill(mask: [UInt8], labeled: inout [Int], x: Int, y: Int, width: Int, height: Int, label: Int, points: inout [CGPoint]) {
+        var stack: [(Int, Int)] = [(x, y)]
+
+        while !stack.isEmpty {
+            let (cx, cy) = stack.removeLast()
+            let idx = cy * width + cx
+
+            guard cx >= 0, cx < width, cy >= 0, cy < height else { continue }
+            guard mask[idx] > 128 && labeled[idx] == 0 else { continue }
+
+            labeled[idx] = label
+            points.append(CGPoint(x: cx, y: cy))
+
+            // Add neighbors (4-connected)
+            stack.append((cx + 1, cy))
+            stack.append((cx - 1, cy))
+            stack.append((cx, cy + 1))
+            stack.append((cx, cy - 1))
+        }
     }
 
     func segmentTools(image: UIImage, workspaceBounds: CGRect?, depthFilter: DepthFilter? = nil) -> SegmentationResult {

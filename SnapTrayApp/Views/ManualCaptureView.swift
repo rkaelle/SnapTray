@@ -590,45 +590,25 @@ struct ManualCaptureView: View {
             pixelToMMScale = detection.pixelToMMScale ?? 1.0
         }
 
-        // Downsample image to reduce memory usage
-        let downsampledImage = downsampleImage(captured.image, maxDimension: 2048)
-
-        // Scale workspace bounds for downsampled image
-        let scale = downsampledImage.size.width / captured.image.size.width
-        let scaledBounds = CGRect(
-            x: workspaceBounds.origin.x * scale,
-            y: workspaceBounds.origin.y * scale,
-            width: workspaceBounds.size.width * scale,
-            height: workspaceBounds.size.height * scale
-        )
-
-        // Segment tools
+        // Segment tools using DEPTH DATA (not image processing!)
         DispatchQueue.main.async {
-            self.statusMessage = "Detecting tools..."
+            self.statusMessage = "Detecting tools from depth..."
         }
 
         let segmenter = SegmentationProcessor()
-        let segmentation = segmenter.segmentTools(
-            image: downsampledImage,
-            workspaceBounds: scaledBounds
+
+        // Use depth-based segmentation - finds objects above the plane
+        let depthMapSize = CGSize(width: 256, height: 192)  // Typical depth map size
+        let segmentation = segmenter.segmentToolsFromDepth(
+            depthPoints: captured.depthData,
+            plane: plane,
+            imageSize: captured.image.size,
+            depthMapSize: depthMapSize,
+            workspaceBounds: workspaceBounds,
+            heightThreshold: 0.005  // 5mm above plane
         )
 
-        // Scale contours back to original size
-        let invScale = 1.0 / scale
-        var scaledContours: [SegmentationProcessor.Contour] = []
-        for contour in segmentation.contours {
-            let scaledPoints = contour.points.map { CGPoint(x: $0.x * invScale, y: $0.y * invScale) }
-            scaledContours.append(SegmentationProcessor.Contour(
-                points: scaledPoints,
-                area: contour.area * invScale * invScale,
-                boundingBox: CGRect(
-                    x: contour.boundingBox.origin.x * invScale,
-                    y: contour.boundingBox.origin.y * invScale,
-                    width: contour.boundingBox.size.width * invScale,
-                    height: contour.boundingBox.size.height * invScale
-                )
-            ))
-        }
+        let scaledContours = segmentation.contours
 
         // Process geometry
         DispatchQueue.main.async {

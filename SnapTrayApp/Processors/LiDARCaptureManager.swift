@@ -22,6 +22,8 @@ class LiDARCaptureManager: NSObject, ObservableObject {
     struct DepthPoint {
         let position: simd_float3  // 3D position in world space
         let confidence: ARConfidenceLevel
+        let pixelX: Int  // Original pixel X coordinate in depth map
+        let pixelY: Int  // Original pixel Y coordinate in depth map
     }
 
     struct DetectedPlane {
@@ -156,7 +158,9 @@ class LiDARCaptureManager: NSObject, ObservableObject {
 
                 points.append(DepthPoint(
                     position: simd_float3(pointInWorld.x, pointInWorld.y, pointInWorld.z),
-                    confidence: confidenceLevel
+                    confidence: confidenceLevel,
+                    pixelX: x,
+                    pixelY: y
                 ))
             }
         }
