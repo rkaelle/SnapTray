@@ -1057,11 +1057,11 @@ struct ManualCaptureView: View {
         imageSize: CGSize,
         depthMapSize: CGSize
     ) -> UIImage? {
-        let width = Int(imageSize.width)
-        let height = Int(imageSize.height)
-
-        // Create pixel buffer for depth visualization
-        var pixels = [UInt8](repeating: 0, count: width * height * 4) // RGBA
+        // Use reasonable output resolution (4x upsampling from LiDAR)
+        let targetWidth = 1024
+        let targetHeight = Int(CGFloat(targetWidth) * imageSize.height / imageSize.width)
+        let width = targetWidth
+        let height = targetHeight
 
         // Find min/max heights above plane for color mapping
         var minHeight: Float = Float.infinity
@@ -1079,44 +1079,95 @@ struct ManualCaptureView: View {
         // If no points above plane, return nil
         guard minHeight != Float.infinity else { return nil }
 
-        let heightRange = max(maxHeight - minHeight, 0.001) // Avoid divide by zero
+        let heightRange = max(maxHeight - minHeight, 0.001)
 
-        // Scale from depth map to image coordinates
-        let scaleX = imageSize.width / depthMapSize.width
-        let scaleY = imageSize.height / depthMapSize.height
+        // Create sparse depth map at original resolution
+        let sparseWidth = Int(depthMapSize.width)
+        let sparseHeight = Int(depthMapSize.height)
+        var sparseDepth = [Float](repeating: -1, count: sparseWidth * sparseHeight)
 
-        // Map each depth point to a pixel with color based on height
+        // Fill sparse depth map
         for point in depthPoints {
             let pointToPlane = point.position - plane.center
             let distance = simd_dot(pointToPlane, plane.normal)
 
             if distance > 0 {
-                // Normalize height to 0-1 range
-                let normalizedHeight = (distance - minHeight) / heightRange
+                let x = point.pixelX
+                let y = point.pixelY
+                if x >= 0 && x < sparseWidth && y >= 0 && y < sparseHeight {
+                    sparseDepth[y * sparseWidth + x] = distance
+                }
+            }
+        }
 
-                // Convert to heat map color (blue -> green -> yellow -> red)
-                let (r, g, b) = heightToColor(normalizedHeight: CGFloat(normalizedHeight))
+        // Upsample to full resolution with bilateral filtering
+        let scaleX = Float(width) / Float(sparseWidth)
+        let scaleY = Float(height) / Float(sparseHeight)
 
-                // Map to pixel coordinates using proportional scaling
-                let x = Int(CGFloat(point.pixelX) * scaleX)
-                let y = Int(CGFloat(point.pixelY) * scaleY)
+        var denseDepth = [Float](repeating: -1, count: width * height)
 
-                // Fill 3x3 region for better visibility
-                for dy in -1...1 {
-                    for dx in -1...1 {
-                        let px = x + dx
-                        let py = y + dy
+        // Multi-pass interpolation for smoother results
+        for pass in 0..<2 {
+            let radius = pass == 0 ? 8 : 4
 
-                        if px >= 0 && px < width && py >= 0 && py < height {
-                            let pixelIndex = (py * width + px) * 4
-                            if pixelIndex + 3 < pixels.count {
-                                pixels[pixelIndex] = UInt8(r * 255)
-                                pixels[pixelIndex + 1] = UInt8(g * 255)
-                                pixels[pixelIndex + 2] = UInt8(b * 255)
-                                pixels[pixelIndex + 3] = 255 // Alpha
+            for y in 0..<height {
+                for x in 0..<width {
+                    // Map to sparse coordinates
+                    let sx = Float(x) / scaleX
+                    let sy = Float(y) / scaleY
+
+                    // Weighted average of nearby sparse points
+                    var sumWeight: Float = 0
+                    var sumDepth: Float = 0
+
+                    let searchRadius = radius
+                    let minSX = max(0, Int(sx) - searchRadius)
+                    let maxSX = min(sparseWidth - 1, Int(sx) + searchRadius)
+                    let minSY = max(0, Int(sy) - searchRadius)
+                    let maxSY = min(sparseHeight - 1, Int(sy) + searchRadius)
+
+                    for ssy in minSY...maxSY {
+                        for ssx in minSX...maxSX {
+                            let idx = ssy * sparseWidth + ssx
+                            if sparseDepth[idx] > 0 {
+                                // Distance-based weight
+                                let dx = Float(ssx) - sx
+                                let dy = Float(ssy) - sy
+                                let dist = sqrt(dx * dx + dy * dy)
+                                let weight = exp(-dist * dist / Float(searchRadius * searchRadius))
+
+                                sumWeight += weight
+                                sumDepth += sparseDepth[idx] * weight
                             }
                         }
                     }
+
+                    if sumWeight > 0.001 {
+                        denseDepth[y * width + x] = sumDepth / sumWeight
+                    }
+                }
+            }
+        }
+
+        // Create color visualization
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+
+        for y in 0..<height {
+            for x in 0..<width {
+                let depth = denseDepth[y * width + x]
+
+                if depth > 0 {
+                    // Normalize height to 0-1 range
+                    let normalizedHeight = (depth - minHeight) / heightRange
+
+                    // Convert to heat map color
+                    let (r, g, b) = heightToColor(normalizedHeight: CGFloat(normalizedHeight))
+
+                    let pixelIndex = (y * width + x) * 4
+                    pixels[pixelIndex] = UInt8(r * 255)
+                    pixels[pixelIndex + 1] = UInt8(g * 255)
+                    pixels[pixelIndex + 2] = UInt8(b * 255)
+                    pixels[pixelIndex + 3] = 255
                 }
             }
         }
@@ -1134,7 +1185,7 @@ struct ManualCaptureView: View {
             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
             provider: providerRef,
             decode: nil,
-            shouldInterpolate: false,
+            shouldInterpolate: true,
             intent: .defaultIntent
         ) else { return nil }
 
