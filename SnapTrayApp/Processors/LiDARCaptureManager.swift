@@ -8,10 +8,9 @@ class LiDARCaptureManager: NSObject, ObservableObject {
     @Published var isCapturing = false
     @Published var detectedPlane: DetectedPlane?
     @Published var workspaceBounds: CGRect?
-
-    var arSession: ARSession?  // Internal access for ARCameraView
-    private var accumulatedDepthFrames: [ARFrame] = []
-    private let maxAccumulatedFrames = 30  // ~1 second at 30fps
+    // Shared AR session exposed for ARSCNView binding
+    let arSession: ARSession = ARSession()
+    private var isSessionRunning = false
 
     struct CapturedFrame {
         let image: UIImage
@@ -33,30 +32,39 @@ class LiDARCaptureManager: NSObject, ObservableObject {
     }
 
     func startSession() {
-        guard ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) else {
-            print("LiDAR not supported on this device")
+        if isSessionRunning { 
+            print("AR session already running; ignoring startSession()")
             return
         }
 
-        let session = ARSession()
+        guard ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) else {
+            print("LiDAR not supported on this device")
+            DispatchQueue.main.async {
+                self.isCapturing = false
+            }
+            return
+        }
+
         let configuration = ARWorldTrackingConfiguration()
         configuration.sceneReconstruction = .mesh
         configuration.frameSemantics = .sceneDepth
 
-        arSession = session
-        arSession?.delegate = self
-        arSession?.run(configuration)
-
-        isCapturing = true
+        DispatchQueue.main.async {
+            self.arSession.delegate = self
+            self.arSession.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+            self.isSessionRunning = true
+            self.isCapturing = true
+        }
     }
 
     func stopSession() {
-        arSession?.pause()
+        arSession.pause()
+        isSessionRunning = false
         isCapturing = false
     }
 
     func captureFrame() {
-        guard let frame = arSession?.currentFrame else { return }
+        guard let frame = arSession.currentFrame else { return }
 
         // Get RGB image
         let pixelBuffer = frame.capturedImage
@@ -110,8 +118,8 @@ class LiDARCaptureManager: NSObject, ObservableObject {
         let viewMatrix = camera.viewMatrix(for: .portrait)
         let intrinsics = camera.intrinsics
 
-        // Sample every 4th pixel for performance
-        let pixelStride = 4
+        // Sample every 6th pixel for performance
+        let pixelStride = 6
 
         for y in stride(from: 0, to: depthHeight, by: pixelStride) {
             for x in stride(from: 0, to: depthWidth, by: pixelStride) {
@@ -271,10 +279,6 @@ class LiDARCaptureManager: NSObject, ObservableObject {
 
 extension LiDARCaptureManager: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        // Accumulate frames for better depth quality
-        accumulatedDepthFrames.append(frame)
-        if accumulatedDepthFrames.count > maxAccumulatedFrames {
-            accumulatedDepthFrames.removeFirst()
-        }
+        // Do not retain frames. If future live processing is needed, throttle it here without storing ARFrame.
     }
 }
