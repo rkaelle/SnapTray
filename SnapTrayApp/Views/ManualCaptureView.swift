@@ -8,7 +8,8 @@ struct ManualCaptureView: View {
 
     @StateObject private var lidarManager = LiDARCaptureManager()
     @State private var captureMode: CaptureMode = .manual
-    @State private var cornerPoints: [CGPoint] = []
+    @State private var cornerPoints: [CGPoint] = []  // 2D screen positions (for display)
+    @State private var cornerWorldPositions: [simd_float3] = []  // 3D world positions (for accuracy)
     @State private var isProcessing = false
     @State private var statusMessage = "Position camera 60-100cm above tools"
     @State private var showGuide = true
@@ -16,6 +17,7 @@ struct ManualCaptureView: View {
     @State private var reticlePosition: CGPoint = .zero
     @State private var screenSize: CGSize = .zero
     @State private var detectionTimer: Timer?
+    @State private var lastARFrame: ARFrame?
 
     enum CaptureMode {
         case manual      // User taps to place corners
@@ -250,6 +252,7 @@ struct ManualCaptureView: View {
     private func toggleMode() {
         captureMode = captureMode == .manual ? .automatic : .manual
         cornerPoints.removeAll()
+        cornerWorldPositions.removeAll()
         statusMessage = captureMode == .manual
             ? "Tap to place 4 corner points"
             : "Positioning camera to detect ArUco markers"
@@ -266,32 +269,125 @@ struct ManualCaptureView: View {
 
     private func handleTap(at point: CGPoint) {
         guard captureMode == .manual && cornerPoints.count < 4 else { return }
-
-        // Use center point as tap location (reticle position)
-        let centerPoint = CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
-        cornerPoints.append(centerPoint)
-
-        // Haptic feedback
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-
-        // Update status
-        switch cornerPoints.count {
-        case 1:
-            statusMessage = "First corner placed. Tap to place second corner"
-        case 2:
-            statusMessage = "Second corner placed. Tap to place third corner"
-        case 3:
-            statusMessage = "Third corner placed. Tap to place fourth corner"
-        case 4:
-            statusMessage = "All corners placed! Tap capture to scan"
-        default:
-            break
+        guard let frame = lastARFrame, let plane = lidarManager.detectedPlane else {
+            statusMessage = "Waiting for plane detection..."
+            return
         }
+
+        // Use center point for hit testing (reticle position)
+        let centerPoint = CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
+
+        // Perform AR hit test at center of screen
+        let normalizedPoint = CGPoint(
+            x: centerPoint.x / screenSize.width,
+            y: centerPoint.y / screenSize.height
+        )
+
+        // Raycast from camera through screen point to find intersection with plane
+        if let worldPosition = hitTestPlane(normalizedPoint: normalizedPoint, plane: plane, frame: frame) {
+            // Store 3D world position
+            cornerWorldPositions.append(worldPosition)
+
+            // Project to screen for display (will be updated each frame)
+            if let screenPos = projectToScreen(worldPosition: worldPosition, frame: frame) {
+                cornerPoints.append(screenPos)
+            } else {
+                // Fallback to center if projection fails
+                cornerPoints.append(centerPoint)
+            }
+
+            // Haptic feedback
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+            // Update status
+            switch cornerPoints.count {
+            case 1:
+                statusMessage = "First corner placed. Move to next corner"
+            case 2:
+                statusMessage = "Second corner placed. Move to next corner"
+            case 3:
+                statusMessage = "Third corner placed. Place final corner"
+            case 4:
+                statusMessage = "All corners placed! Tap capture to scan"
+            default:
+                break
+            }
+        } else {
+            statusMessage = "Can't place point - no plane intersection"
+        }
+    }
+
+    private func hitTestPlane(normalizedPoint: CGPoint, plane: LiDARCaptureManager.DetectedPlane, frame: ARFrame) -> simd_float3? {
+        // Get camera position and create ray
+        let cameraTransform = frame.camera.transform
+        let cameraPosition = simd_float3(cameraTransform.columns.3.x, cameraTransform.columns.3.y, cameraTransform.columns.3.z)
+
+        // Convert normalized screen point to view direction
+        let viewMatrix = frame.camera.viewMatrix(for: .portrait)
+        let projectionMatrix = frame.camera.projectionMatrix(for: .portrait, viewportSize: screenSize, zNear: 0.001, zFar: 1000)
+
+        // Convert from normalized screen space to NDC
+        let ndcX = Float(normalizedPoint.x) * 2.0 - 1.0
+        let ndcY = (1.0 - Float(normalizedPoint.y)) * 2.0 - 1.0
+
+        // Unproject to get ray direction
+        let invProjection = simd_inverse(projectionMatrix)
+        let invView = simd_inverse(viewMatrix)
+
+        let rayNDC = simd_float4(ndcX, ndcY, 1.0, 1.0)
+        let rayEye = invProjection * rayNDC
+        let rayEye4 = simd_float4(rayEye.x, rayEye.y, -1.0, 0.0)
+        let rayWorld4 = invView * rayEye4
+        let rayDirection = simd_normalize(simd_float3(rayWorld4.x, rayWorld4.y, rayWorld4.z))
+
+        // Intersect ray with plane
+        let planeNormal = plane.normal
+        let planePoint = plane.center
+
+        let denom = simd_dot(rayDirection, planeNormal)
+        if abs(denom) > 0.0001 {
+            let t = simd_dot(planePoint - cameraPosition, planeNormal) / denom
+            if t > 0 {
+                return cameraPosition + rayDirection * t
+            }
+        }
+
+        return nil
+    }
+
+    private func projectToScreen(worldPosition: simd_float3, frame: ARFrame) -> CGPoint? {
+        let viewMatrix = frame.camera.viewMatrix(for: .portrait)
+        let projectionMatrix = frame.camera.projectionMatrix(for: .portrait, viewportSize: screenSize, zNear: 0.001, zFar: 1000)
+
+        // Transform to clip space
+        let worldPos4 = simd_float4(worldPosition.x, worldPosition.y, worldPosition.z, 1.0)
+        let viewPos = viewMatrix * worldPos4
+        let clipPos = projectionMatrix * viewPos
+
+        // Perspective divide
+        if clipPos.w != 0 {
+            let ndc = simd_float3(clipPos.x / clipPos.w, clipPos.y / clipPos.w, clipPos.z / clipPos.w)
+
+            // Convert to screen coordinates
+            let screenX = (ndc.x + 1.0) * 0.5 * Float(screenSize.width)
+            let screenY = (1.0 - ndc.y) * 0.5 * Float(screenSize.height)
+
+            return CGPoint(x: CGFloat(screenX), y: CGFloat(screenY))
+        }
+
+        return nil
+    }
+
+    private func distance(_ p1: CGPoint, _ p2: CGPoint) -> Double {
+        let dx = p2.x - p1.x
+        let dy = p2.y - p1.y
+        return sqrt(Double(dx * dx + dy * dy))
     }
 
     private func undoLastCorner() {
         guard !cornerPoints.isEmpty else { return }
         cornerPoints.removeLast()
+        cornerWorldPositions.removeLast()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         statusMessage = cornerPoints.isEmpty
@@ -301,6 +397,7 @@ struct ManualCaptureView: View {
 
     private func resetCorners() {
         cornerPoints.removeAll()
+        cornerWorldPositions.removeAll()
         statusMessage = "Tap to place first corner"
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
     }
@@ -319,16 +416,47 @@ struct ManualCaptureView: View {
         // Invalidate any existing timer
         detectionTimer?.invalidate()
 
-        // Create new timer and store it - runs every 0.5 seconds for plane detection
-        detectionTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [self] timer in
+        // Create new timer and store it - runs frequently for smooth point tracking
+        detectionTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { [self] timer in
             guard !isProcessing else { return }
 
-            // Update plane detection status (lightweight check)
-            DispatchQueue.main.async {
-                detectionStatus.planeDetected = lidarManager.detectedPlane != nil
-                detectionStatus.planeQuality = lidarManager.detectedPlane != nil ? "Good" : "No plane"
-                detectionStatus.lastUpdate = Date()
+            // Get current AR frame
+            if let frame = lidarManager.arSession.currentFrame {
+                DispatchQueue.main.async {
+                    self.lastARFrame = frame
+
+                    // Update plane detection status
+                    self.detectionStatus.planeDetected = self.lidarManager.detectedPlane != nil
+                    self.detectionStatus.planeQuality = self.lidarManager.detectedPlane != nil ? "Good" : "No plane"
+                    self.detectionStatus.lastUpdate = Date()
+
+                    // Update corner point projections if we have placed points
+                    if !self.cornerWorldPositions.isEmpty {
+                        self.updateCornerProjections(frame: frame)
+                    }
+                }
             }
+        }
+    }
+
+    private func updateCornerProjections(frame: ARFrame) {
+        // Re-project all 3D world positions to current screen coordinates
+        var updatedPoints: [CGPoint] = []
+
+        for worldPos in cornerWorldPositions {
+            if let screenPos = projectToScreen(worldPosition: worldPos, frame: frame) {
+                updatedPoints.append(screenPos)
+            } else {
+                // Keep old position if projection fails
+                if updatedPoints.count < cornerPoints.count {
+                    updatedPoints.append(cornerPoints[updatedPoints.count])
+                }
+            }
+        }
+
+        // Update the display positions
+        if updatedPoints.count == cornerWorldPositions.count {
+            cornerPoints = updatedPoints
         }
     }
 
@@ -379,18 +507,43 @@ struct ManualCaptureView: View {
         var workspaceBounds: CGRect
         var pixelToMMScale: Double = 1.0
 
-        if captureMode == .manual && cornerPoints.count == 4 {
-            // Use manual corners
-            let minX = cornerPoints.map { $0.x }.min() ?? 0
-            let maxX = cornerPoints.map { $0.x }.max() ?? captured.image.size.width
-            let minY = cornerPoints.map { $0.y }.min() ?? 0
-            let maxY = cornerPoints.map { $0.y }.max() ?? captured.image.size.height
+        if captureMode == .manual && cornerPoints.count == 4 && cornerWorldPositions.count == 4 {
+            // Use manual corners - project world positions to final image
+            guard let finalFrame = lastARFrame else {
+                statusMessage = "No frame available"
+                isProcessing = false
+                return
+            }
+
+            // Project all 4 world positions to screen coordinates on the captured image
+            var projectedCorners: [CGPoint] = []
+            for worldPos in cornerWorldPositions {
+                if let screenPos = projectToScreen(worldPosition: worldPos, frame: finalFrame) {
+                    projectedCorners.append(screenPos)
+                }
+            }
+
+            // Use projected corners for bounds
+            let minX = projectedCorners.map { $0.x }.min() ?? 0
+            let maxX = projectedCorners.map { $0.x }.max() ?? captured.image.size.width
+            let minY = projectedCorners.map { $0.y }.min() ?? 0
+            let maxY = projectedCorners.map { $0.y }.max() ?? captured.image.size.height
 
             workspaceBounds = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
 
-            // Estimate scale based on assumed workspace size (e.g., 300mm width)
-            let assumedWidthMM = 300.0
-            pixelToMMScale = assumedWidthMM / Double(workspaceBounds.width)
+            // Calculate real-world scale from 3D distances
+            // Use the distance between first two corners as reference
+            let worldDist1 = simd_distance(cornerWorldPositions[0], cornerWorldPositions[1])
+            let worldDist2 = simd_distance(cornerWorldPositions[1], cornerWorldPositions[2])
+            let avgWorldWidth = (worldDist1 + worldDist2) / 2.0  // meters
+
+            let pixelDist1 = distance(projectedCorners[0], projectedCorners[1])
+            let pixelDist2 = distance(projectedCorners[1], projectedCorners[2])
+            let avgPixelWidth = (pixelDist1 + pixelDist2) / 2.0  // pixels
+
+            // Convert meters to mm and calculate scale
+            let worldWidthMM = avgWorldWidth * 1000.0  // Convert to mm
+            pixelToMMScale = worldWidthMM / avgPixelWidth
         } else {
             // Use ArUco detection
             let arucoDetector = ArucoDetector()
