@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 import simd
 
-struct Project: Codable, Identifiable {
+struct Project: Codable, Identifiable, Hashable {
     let id: UUID
     var name: String
     var createdDate: Date
@@ -72,6 +72,15 @@ struct Project: Codable, Identifiable {
         try container.encode(tools, forKey: .tools)
         try container.encode(traySettings, forKey: .traySettings)
         // cameraTransform is not encoded (matrix_float4x4 doesn't conform to Codable)
+    }
+
+    // Hashable conformance based on unique id
+    static func == (lhs: Project, rhs: Project) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 

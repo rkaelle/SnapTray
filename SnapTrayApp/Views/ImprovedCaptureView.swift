@@ -388,7 +388,7 @@ struct TroubleshootTip: View {
     }
 }
 
-struct GuideStep: View {
+private struct GuideStep: View {
     let number: Int
     let text: String
 
