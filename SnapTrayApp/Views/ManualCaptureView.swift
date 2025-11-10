@@ -312,7 +312,7 @@ struct ManualCaptureView: View {
             if captureMode == .automatic, let captured = lidarManager.capturedFrame {
                 let detector = ArucoDetector()
                 let detection = detector.detectMarkers(in: captured.image)
-                detectionStatus.arucoMarkersDetected = detection.fiducials.count
+                detectionStatus.arucoMarkersDetected = detection.markers.count
             }
 
             detectionStatus.lastUpdate = Date()
@@ -359,7 +359,7 @@ struct ManualCaptureView: View {
             // Use ArUco detection
             let arucoDetector = ArucoDetector()
             let detection = arucoDetector.detectMarkers(in: captured.image)
-            workspaceBounds = detection.workspaceBounds
+            workspaceBounds = detection.workspaceBounds ?? CGRect(x: 0, y: 0, width: captured.image.size.width, height: captured.image.size.height)
             pixelToMMScale = detection.pixelToMMScale ?? 1.0
         }
 
