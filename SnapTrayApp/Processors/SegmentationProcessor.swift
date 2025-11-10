@@ -15,6 +15,9 @@ class SegmentationProcessor {
         let boundingBox: CGRect
     }
 
+    // Reuse CIContext to save memory
+    private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+
     func segmentTools(image: UIImage, workspaceBounds: CGRect?, depthFilter: DepthFilter? = nil) -> SegmentationResult {
         guard let cgImage = image.cgImage else {
             return SegmentationResult(contours: [], processedImage: nil)
@@ -86,8 +89,7 @@ class SegmentationProcessor {
 
         guard let output = filter?.outputImage else { return cgImage }
 
-        let context = CIContext()
-        guard let result = context.createCGImage(output, from: output.extent) else { return cgImage }
+        guard let result = ciContext.createCGImage(output, from: output.extent) else { return cgImage }
 
         return result
     }
@@ -102,8 +104,7 @@ class SegmentationProcessor {
 
         guard let output = filter?.outputImage else { return cgImage }
 
-        let context = CIContext()
-        guard let result = context.createCGImage(output, from: output.extent) else { return cgImage }
+        guard let result = ciContext.createCGImage(output, from: output.extent) else { return cgImage }
 
         return result
     }

@@ -383,6 +383,24 @@ struct ManualCaptureView: View {
         return sqrt(Double(dx * dx + dy * dy))
     }
 
+    private func downsampleImage(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
+        let size = image.size
+        let maxDim = max(size.width, size.height)
+
+        // If already smaller, return original
+        guard maxDim > maxDimension else { return image }
+
+        let scale = maxDimension / maxDim
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+        let resized = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+
+        return resized ?? image
+    }
+
     private func undoLastCorner() {
         guard !cornerPoints.isEmpty else { return }
         cornerPoints.removeLast()
@@ -500,7 +518,18 @@ struct ManualCaptureView: View {
             return
         }
 
-        statusMessage = "Detecting workspace..."
+        // Move heavy processing to background thread to prevent memory spikes
+        DispatchQueue.global(qos: .userInitiated).async {
+            autoreleasepool {
+                self.performProcessing(captured: captured, plane: plane)
+            }
+        }
+    }
+
+    private func performProcessing(captured: LiDARCaptureManager.CapturedFrame, plane: LiDARCaptureManager.DetectedPlane) {
+        DispatchQueue.main.async {
+            self.statusMessage = "Detecting workspace..."
+        }
 
         var workspaceBounds: CGRect
         var pixelToMMScale: Double = 1.0
@@ -508,8 +537,10 @@ struct ManualCaptureView: View {
         if captureMode == .manual && cornerPoints.count == 4 && cornerWorldPositions.count == 4 {
             // Use manual corners - project world positions to final image
             guard let finalFrame = lidarManager.arSession.currentFrame else {
-                statusMessage = "No frame available"
-                isProcessing = false
+                DispatchQueue.main.async {
+                    self.statusMessage = "No frame available"
+                    self.isProcessing = false
+                }
                 return
             }
 
@@ -523,8 +554,10 @@ struct ManualCaptureView: View {
 
             // Ensure we got all 4 corners projected
             guard projectedCorners.count == 4 else {
-                statusMessage = "Failed to project corners - please try again"
-                isProcessing = false
+                DispatchQueue.main.async {
+                    self.statusMessage = "Failed to project corners - please try again"
+                    self.isProcessing = false
+                }
                 return
             }
 
@@ -557,51 +590,86 @@ struct ManualCaptureView: View {
             pixelToMMScale = detection.pixelToMMScale ?? 1.0
         }
 
+        // Downsample image to reduce memory usage
+        let downsampledImage = downsampleImage(captured.image, maxDimension: 2048)
+
+        // Scale workspace bounds for downsampled image
+        let scale = downsampledImage.size.width / captured.image.size.width
+        let scaledBounds = CGRect(
+            x: workspaceBounds.origin.x * scale,
+            y: workspaceBounds.origin.y * scale,
+            width: workspaceBounds.size.width * scale,
+            height: workspaceBounds.size.height * scale
+        )
+
         // Segment tools
-        statusMessage = "Detecting tools..."
+        DispatchQueue.main.async {
+            self.statusMessage = "Detecting tools..."
+        }
 
         let segmenter = SegmentationProcessor()
         let segmentation = segmenter.segmentTools(
-            image: captured.image,
-            workspaceBounds: workspaceBounds
+            image: downsampledImage,
+            workspaceBounds: scaledBounds
         )
 
+        // Scale contours back to original size
+        let invScale = 1.0 / scale
+        var scaledContours: [SegmentationProcessor.Contour] = []
+        for contour in segmentation.contours {
+            let scaledPoints = contour.points.map { CGPoint(x: $0.x * invScale, y: $0.y * invScale) }
+            scaledContours.append(SegmentationProcessor.Contour(
+                points: scaledPoints,
+                area: contour.area * invScale * invScale,
+                boundingBox: CGRect(
+                    x: contour.boundingBox.origin.x * invScale,
+                    y: contour.boundingBox.origin.y * invScale,
+                    width: contour.boundingBox.size.width * invScale,
+                    height: contour.boundingBox.size.height * invScale
+                )
+            ))
+        }
+
         // Process geometry
-        statusMessage = "Processing geometry..."
+        DispatchQueue.main.async {
+            self.statusMessage = "Processing geometry..."
+        }
 
         let geometryProcessor = GeometryProcessor()
         var tools: [Tool] = []
 
-        for contour in segmentation.contours {
-            let simplified = geometryProcessor.simplifyContour(contour.points, tolerance: 2.0)
+        for contour in scaledContours {
+            autoreleasepool {
+                let simplified = geometryProcessor.simplifyContour(contour.points, tolerance: 2.0)
 
-            let depths = lidarManager.getDepthAtContour(
-                contour: simplified,
-                plane: plane,
-                allPoints: captured.depthData
-            )
+                let depths = lidarManager.getDepthAtContour(
+                    contour: simplified,
+                    plane: plane,
+                    allPoints: captured.depthData
+                )
 
-            let maxDepth = depths.isEmpty ? 10.0 : Double(depths.sorted().dropLast(Int(Double(depths.count) * 0.02)).last ?? 10.0)
+                let maxDepth = depths.isEmpty ? 10.0 : Double(depths.sorted().dropLast(Int(Double(depths.count) * 0.02)).last ?? 10.0)
 
-            var tool = Tool(contour: simplified, maxDepth: maxDepth)
+                var tool = Tool(contour: simplified, maxDepth: maxDepth)
 
-            let offset = -0.25
-            tool.offsetContour = geometryProcessor.offsetContour(simplified, offset: offset)
-            tool.offsetContour = geometryProcessor.applyFillets(tool.offsetContour, radius: 2.5)
+                let offset = -0.25
+                tool.offsetContour = geometryProcessor.offsetContour(simplified, offset: offset)
+                tool.offsetContour = geometryProcessor.applyFillets(tool.offsetContour, radius: 2.5)
 
-            let longestEdge = geometryProcessor.findLongestEdge(in: tool.offsetContour)
-            let notchRadius = geometryProcessor.calculateNotchRadius(for: tool.boundingBox)
+                let longestEdge = geometryProcessor.findLongestEdge(in: tool.offsetContour)
+                let notchRadius = geometryProcessor.calculateNotchRadius(for: tool.boundingBox)
 
-            let notch = FingerNotch(
-                position: tool.offsetContour[longestEdge],
-                radius: notchRadius,
-                edgeIndex: longestEdge,
-                normalizedPosition: 0.35
-            )
-            tool.fingerNotch = notch
-            tool.offsetContour = geometryProcessor.addFingerNotch(to: tool.offsetContour, notch: notch)
+                let notch = FingerNotch(
+                    position: tool.offsetContour[longestEdge],
+                    radius: notchRadius,
+                    edgeIndex: longestEdge,
+                    normalizedPosition: 0.35
+                )
+                tool.fingerNotch = notch
+                tool.offsetContour = geometryProcessor.addFingerNotch(to: tool.offsetContour, notch: notch)
 
-            tools.append(tool)
+                tools.append(tool)
+            }
         }
 
         var project = Project(name: "Tray \(Date().formatted(date: .numeric, time: .omitted))")
@@ -613,11 +681,18 @@ struct ManualCaptureView: View {
             project.capturedImage = imageData
         }
 
-        statusMessage = "Done!"
+        DispatchQueue.main.async {
+            self.statusMessage = "Done!"
+        }
+
+        // Clear captured frame to free memory
+        DispatchQueue.main.async {
+            self.lidarManager.capturedFrame = nil
+        }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            isProcessing = false
-            onCaptureDone(project)
+            self.isProcessing = false
+            self.onCaptureDone(project)
         }
     }
 }
