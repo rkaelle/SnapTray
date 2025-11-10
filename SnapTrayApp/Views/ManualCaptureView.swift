@@ -39,6 +39,9 @@ struct ManualCaptureView: View {
         var arucoMarkersDetected = 0
         var planeQuality: String = "No plane"
         var lastUpdate = Date()
+        var distanceToPlane: Float = 0  // Distance from camera to plane in cm
+        var angleToPlane: Float = 0  // Angle in degrees
+        var pointsAbovePlane: Int = 0  // Number of depth points above plane
     }
 
     var body: some View {
@@ -541,6 +544,37 @@ struct ManualCaptureView: View {
                     self.detectionStatus.planeQuality = self.lidarManager.detectedPlane != nil ? "Good" : "No plane"
                     self.detectionStatus.lastUpdate = Date()
 
+                    // Calculate live stats if plane detected
+                    if let plane = self.lidarManager.detectedPlane {
+                        let cameraPos = simd_float3(
+                            frame.camera.transform.columns.3.x,
+                            frame.camera.transform.columns.3.y,
+                            frame.camera.transform.columns.3.z
+                        )
+
+                        // Distance from camera to plane
+                        let distanceMeters = simd_distance(cameraPos, plane.center)
+                        self.detectionStatus.distanceToPlane = distanceMeters * 100 // Convert to cm
+
+                        // Angle between camera forward and plane normal
+                        let cameraForward = simd_float3(
+                            frame.camera.transform.columns.2.x,
+                            frame.camera.transform.columns.2.y,
+                            frame.camera.transform.columns.2.z
+                        )
+                        let angleRad = acos(abs(simd_dot(cameraForward, plane.normal)))
+                        self.detectionStatus.angleToPlane = angleRad * 180.0 / .pi
+
+                        // Count points above plane
+                        if let sceneDepth = frame.sceneDepth {
+                            self.detectionStatus.pointsAbovePlane = self.countPointsAbovePlane(
+                                frame: frame,
+                                plane: plane,
+                                sceneDepth: sceneDepth
+                            )
+                        }
+                    }
+
                     // Update corner point projections if we have placed points
                     if !self.cornerWorldPositions.isEmpty {
                         self.updateCornerProjections(frame: frame)
@@ -602,6 +636,55 @@ struct ManualCaptureView: View {
         }
     }
 
+    private func countPointsAbovePlane(frame: ARFrame, plane: LiDARCaptureManager.DetectedPlane, sceneDepth: ARDepthData) -> Int {
+        let depthMap = sceneDepth.depthMap
+        let depthWidth = CVPixelBufferGetWidth(depthMap)
+        let depthHeight = CVPixelBufferGetHeight(depthMap)
+
+        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+
+        guard let depthData = CVPixelBufferGetBaseAddress(depthMap) else {
+            return 0
+        }
+
+        let depthPointer = depthData.assumingMemoryBound(to: Float32.self)
+        let rowBytes = CVPixelBufferGetBytesPerRow(depthMap)
+        let floatsPerRow = rowBytes / MemoryLayout<Float32>.stride
+
+        var count = 0
+        let heightThreshold: Float = 0.001  // 1mm
+
+        // Sample every 8th pixel for speed
+        for y in Swift.stride(from: 0, to: depthHeight, by: 8) {
+            for x in Swift.stride(from: 0, to: depthWidth, by: 8) {
+                let depth = depthPointer[y * floatsPerRow + x]
+                guard depth > 0 && depth < 5.0 else { continue }
+
+                let normalizedX = Float(x) / Float(depthWidth - 1)
+                let normalizedY = Float(y) / Float(depthHeight - 1)
+                let viewportPoint = CGPoint(x: CGFloat(normalizedX), y: CGFloat(normalizedY))
+
+                guard let ray = frame.camera.unprojectPoint(
+                    viewportPoint,
+                    ontoPlane: matrix_identity_float4x4,
+                    orientation: .portrait,
+                    viewportSize: CGSize(width: depthWidth, height: depthHeight)
+                ) else { continue }
+
+                let worldPosition = ray * depth
+                let pointToPlane = worldPosition - plane.center
+                let distanceAbovePlane = simd_dot(pointToPlane, plane.normal)
+
+                if distanceAbovePlane > heightThreshold {
+                    count += 1
+                }
+            }
+        }
+
+        return count
+    }
+
     private func updateHeatMap(frame: ARFrame) {
         guard let plane = lidarManager.detectedPlane,
               let sceneDepth = frame.sceneDepth else {
@@ -626,14 +709,10 @@ struct ManualCaptureView: View {
         let floatsPerRow = rowBytes / MemoryLayout<Float32>.stride
 
         var points: [CGPoint] = []
-        let heightThreshold: Float = 0.002  // 2mm above plane (more sensitive)
+        let heightThreshold: Float = 0.001  // 1mm above plane - very sensitive
 
-        // Sample every 6th pixel for decent coverage
-        let stepSize = 6
-
-        // Simple proportional scale from depth map to screen
-        let scaleX = screenSize.width / CGFloat(depthWidth)
-        let scaleY = screenSize.height / CGFloat(depthHeight)
+        // Sample every 4th pixel for good coverage
+        let stepSize = 4
 
         for y in Swift.stride(from: 0, to: depthHeight, by: stepSize) {
             for x in Swift.stride(from: 0, to: depthWidth, by: stepSize) {
@@ -661,17 +740,21 @@ struct ManualCaptureView: View {
                 let distanceAbovePlane = simd_dot(pointToPlane, plane.normal)
 
                 if distanceAbovePlane > heightThreshold {
-                    // Simple proportional mapping to screen coordinates
-                    let screenX = CGFloat(x) * scaleX
-                    let screenY = CGFloat(y) * scaleY
-                    points.append(CGPoint(x: screenX, y: screenY))
+                    // Project 3D world position to screen using proper view/projection matrices
+                    if let screenPos = projectToScreen(worldPosition: worldPosition, frame: frame) {
+                        // Only add if within screen bounds
+                        if screenPos.x >= 0 && screenPos.x <= screenSize.width &&
+                           screenPos.y >= 0 && screenPos.y <= screenSize.height {
+                            points.append(screenPos)
+                        }
+                    }
                 }
             }
         }
 
         // Limit to reasonable number for performance
-        if points.count > 2000 {
-            points = Array(points.prefix(2000))
+        if points.count > 3000 {
+            points = Array(points.prefix(3000))
         }
 
         heatMapPoints = points
@@ -1033,8 +1116,8 @@ struct DetectionStatusPanel: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 16) {
-                // Plane detection
+            // First row: Plane and markers (if auto mode)
+            HStack(spacing: 12) {
                 StatusBadge(
                     icon: "cube.transparent",
                     label: "Plane",
@@ -1043,7 +1126,6 @@ struct DetectionStatusPanel: View {
                 )
 
                 if mode == .automatic {
-                    // ArUco markers
                     StatusBadge(
                         icon: "qrcode",
                         label: "Markers",
@@ -1052,10 +1134,65 @@ struct DetectionStatusPanel: View {
                     )
                 }
             }
+
+            // Second row: Live metrics when plane detected
+            if status.planeDetected {
+                HStack(spacing: 12) {
+                    // Distance
+                    let distanceGood = status.distanceToPlane >= 60 && status.distanceToPlane <= 100
+                    StatusBadge(
+                        icon: "arrow.up.and.down",
+                        label: "Distance",
+                        value: String(format: "%.0f cm", status.distanceToPlane),
+                        isGood: distanceGood
+                    )
+
+                    // Angle
+                    let angleGood = status.angleToPlane < 15
+                    StatusBadge(
+                        icon: "angle",
+                        label: "Angle",
+                        value: String(format: "%.0f°", status.angleToPlane),
+                        isGood: angleGood
+                    )
+
+                    // Points above plane
+                    let pointsGood = status.pointsAbovePlane > 20
+                    StatusBadge(
+                        icon: "circle.hexagongrid.fill",
+                        label: "Objects",
+                        value: "\(status.pointsAbovePlane)",
+                        isGood: pointsGood
+                    )
+                }
+
+                // Guidance text
+                if !distanceGood || !angleGood {
+                    Text(guidanceText)
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 4)
+                }
+            }
         }
         .padding(12)
         .background(.ultraThinMaterial)
         .cornerRadius(12)
+    }
+
+    private var guidanceText: String {
+        let distance = status.distanceToPlane
+        let angle = status.angleToPlane
+
+        if angle > 15 {
+            return "📱 Hold phone more parallel to surface"
+        } else if distance < 60 {
+            return "⬆️ Move phone farther away (60-100cm ideal)"
+        } else if distance > 100 {
+            return "⬇️ Move phone closer (60-100cm ideal)"
+        }
+        return "✓ Good position"
     }
 }
 
