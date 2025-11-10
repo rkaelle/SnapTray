@@ -20,6 +20,11 @@
 		A100000000000021 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000022 /* CaptureView.swift */; };
 		A100000000000023 /* ConfirmView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000024 /* ConfirmView.swift */; };
 		A100000000000025 /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000026 /* ExportView.swift */; };
+		A100000000000050 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000051 /* MainTabView.swift */; };
+		A100000000000052 /* ProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000053 /* ProjectsView.swift */; };
+		A100000000000054 /* TutorialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000055 /* TutorialView.swift */; };
+		A100000000000056 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000057 /* SettingsView.swift */; };
+		A100000000000058 /* ImprovedCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000059 /* ImprovedCaptureView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +43,11 @@
 		A100000000000026 /* ExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportView.swift; sourceTree = "<group>"; };
 		A100000000000027 /* SnapTrayApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapTrayApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A100000000000028 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A100000000000051 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		A100000000000053 /* ProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsView.swift; sourceTree = "<group>"; };
+		A100000000000055 /* TutorialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialView.swift; sourceTree = "<group>"; };
+		A100000000000057 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A100000000000059 /* ImprovedCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImprovedCaptureView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,6 +126,11 @@
 				A100000000000022 /* CaptureView.swift */,
 				A100000000000024 /* ConfirmView.swift */,
 				A100000000000026 /* ExportView.swift */,
+				A100000000000051 /* MainTabView.swift */,
+				A100000000000053 /* ProjectsView.swift */,
+				A100000000000055 /* TutorialView.swift */,
+				A100000000000057 /* SettingsView.swift */,
+				A100000000000059 /* ImprovedCaptureView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -201,6 +216,11 @@
 				A100000000000021 /* CaptureView.swift in Sources */,
 				A100000000000023 /* ConfirmView.swift in Sources */,
 				A100000000000025 /* ExportView.swift in Sources */,
+				A100000000000050 /* MainTabView.swift in Sources */,
+				A100000000000052 /* ProjectsView.swift in Sources */,
+				A100000000000054 /* TutorialView.swift in Sources */,
+				A100000000000056 /* SettingsView.swift in Sources */,
+				A100000000000058 /* ImprovedCaptureView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

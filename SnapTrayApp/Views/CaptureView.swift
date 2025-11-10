@@ -294,7 +294,7 @@ struct ARCameraView: UIViewRepresentable {
         arView.backgroundColor = .black
 
         // Ensure a scene exists
-        arView.scene = arView.scene ?? SCNScene()
+        arView.scene = SCNScene()
 
         // Configure a child node that holds a rotated SCNPlane so its normal aligns with the plane normal
         let planeSize: CGFloat = 1.2 // meters, visual aid size
