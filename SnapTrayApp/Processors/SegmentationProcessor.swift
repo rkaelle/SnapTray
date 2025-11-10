@@ -27,15 +27,16 @@ class SegmentationProcessor {
         workspaceBounds: CGRect?,
         heightThreshold: Float = 0.005 // 5mm above plane
     ) -> SegmentationResult {
-        let width = Int(imageSize.width)
-        let height = Int(imageSize.height)
+        // OPTIMIZATION: Work with smaller mask for speed, then scale up
+        let workingWidth = 512
+        let workingHeight = Int(512 * imageSize.height / imageSize.width)
 
-        // Create binary mask of points above plane
-        var mask = [UInt8](repeating: 0, count: width * height)
+        // Scale factors
+        let scaleToWorking = CGFloat(workingWidth) / imageSize.width
+        let scaleFromDepth = CGFloat(workingWidth) / depthMapSize.width
 
-        // Calculate scale from depth map to image
-        let scaleX = imageSize.width / depthMapSize.width
-        let scaleY = imageSize.height / depthMapSize.height
+        // Create small binary mask
+        var mask = [UInt8](repeating: 0, count: workingWidth * workingHeight)
 
         // Mark pixels where depth points are above the plane
         for point in depthPoints {
@@ -45,38 +46,52 @@ class SegmentationProcessor {
 
             // If point is above plane by threshold, mark it in the mask
             if distance > heightThreshold {
-                // Scale depth map coordinates to image size
-                let imgX = Int(CGFloat(point.pixelX) * scaleX)
-                let imgY = Int(CGFloat(point.pixelY) * scaleY)
+                // Scale depth coordinates to working size
+                let x = Int(CGFloat(point.pixelX) * scaleFromDepth)
+                let y = Int(CGFloat(point.pixelY) * scaleFromDepth)
 
-                // Fill a region around this point to account for sampling
-                let radius = max(Int(scaleX), Int(scaleY)) + 2
-                for dy in -radius...radius {
-                    for dx in -radius...radius {
-                        let px = imgX + dx
-                        let py = imgY + dy
-                        if px >= 0 && px < width && py >= 0 && py < height {
-                            mask[py * width + px] = 255
+                // Fill small region (3x3) around point
+                for dy in -1...1 {
+                    for dx in -1...1 {
+                        let px = x + dx
+                        let py = y + dy
+                        if px >= 0 && px < workingWidth && py >= 0 && py < workingHeight {
+                            mask[py * workingWidth + px] = 255
                         }
                     }
                 }
             }
         }
 
-        // Apply morphological closing to connect nearby regions
-        mask = morphologicalCloseMask(mask, width: width, height: height, kernelSize: 9)
+        // Fast morphological closing (smaller kernel)
+        mask = morphologicalCloseMask(mask, width: workingWidth, height: workingHeight, kernelSize: 5)
 
-        // Find connected components
-        let contours = extractContoursFromMask(mask, width: width, height: height)
+        // Find connected components (simplified)
+        let contours = extractContoursFromMaskFast(mask, width: workingWidth, height: workingHeight, minSize: 50)
+
+        // Scale contours back to original size
+        let scaleUp = imageSize.width / CGFloat(workingWidth)
+        var scaledContours: [Contour] = []
+        for contour in contours {
+            let scaledPoints = contour.points.map { CGPoint(x: $0.x * scaleUp, y: $0.y * scaleUp) }
+            let area = contour.area * scaleUp * scaleUp
+            let bbox = CGRect(
+                x: contour.boundingBox.origin.x * scaleUp,
+                y: contour.boundingBox.origin.y * scaleUp,
+                width: contour.boundingBox.size.width * scaleUp,
+                height: contour.boundingBox.size.height * scaleUp
+            )
+            scaledContours.append(Contour(points: scaledPoints, area: area, boundingBox: bbox))
+        }
 
         // Filter by workspace bounds
-        var filteredContours = contours
+        var filteredContours = scaledContours
         if let bounds = workspaceBounds {
-            filteredContours = contours.filter { isContourInBounds($0, bounds: bounds) }
+            filteredContours = scaledContours.filter { isContourInBounds($0, bounds: bounds) }
         }
 
         // Filter by area (remove small noise)
-        let minAreaPixels = 1000.0  // Minimum area for a tool
+        let minAreaPixels = 1000.0
         filteredContours = filteredContours.filter { $0.area > minAreaPixels }
 
         let processedImage = visualizeContours(contours: filteredContours, imageSize: imageSize)
@@ -90,6 +105,53 @@ class SegmentationProcessor {
         var dilated = morphologicalOperation(input, width: width, height: height, kernelSize: kernelSize, isDilation: true)
         // Erode
         return morphologicalOperation(dilated, width: width, height: height, kernelSize: kernelSize, isDilation: false)
+    }
+
+    // FAST: Extract contours from binary mask using simplified connected components
+    private func extractContoursFromMaskFast(_ mask: [UInt8], width: Int, height: Int, minSize: Int) -> [Contour] {
+        var labeled = [Int](repeating: 0, count: width * height)
+        var nextLabel = 1
+        var contours: [Contour] = []
+
+        // Connected components with size filtering
+        for y in stride(from: 0, to: height, by: 2) {  // Skip every other row for speed
+            for x in stride(from: 0, to: width, by: 2) {  // Skip every other column
+                let idx = y * width + x
+                if mask[idx] > 128 && labeled[idx] == 0 {
+                    // Start new component with iterative flood fill
+                    var componentBounds = (minX: x, maxX: x, minY: y, maxY: y)
+                    let size = floodFillIterative(mask: mask, labeled: &labeled, x: x, y: y, width: width, height: height, label: nextLabel, bounds: &componentBounds)
+
+                    if size >= minSize {
+                        // Create simplified contour from bounding box
+                        let bbox = CGRect(
+                            x: componentBounds.minX,
+                            y: componentBounds.minY,
+                            width: componentBounds.maxX - componentBounds.minX,
+                            height: componentBounds.maxY - componentBounds.minY
+                        )
+
+                        // Simple rectangular contour (fast)
+                        let points = [
+                            CGPoint(x: bbox.minX, y: bbox.minY),
+                            CGPoint(x: bbox.maxX, y: bbox.minY),
+                            CGPoint(x: bbox.maxX, y: bbox.maxY),
+                            CGPoint(x: bbox.minX, y: bbox.maxY)
+                        ]
+
+                        contours.append(Contour(
+                            points: points,
+                            area: bbox.width * bbox.height,
+                            boundingBox: bbox
+                        ))
+                    }
+
+                    nextLabel += 1
+                }
+            }
+        }
+
+        return contours
     }
 
     // Helper: Extract contours from binary mask using connected components
@@ -119,6 +181,37 @@ class SegmentationProcessor {
         }
 
         return contours
+    }
+
+    // FAST: Iterative flood fill that just tracks bounds
+    private func floodFillIterative(mask: [UInt8], labeled: inout [Int], x: Int, y: Int, width: Int, height: Int, label: Int, bounds: inout (minX: Int, maxX: Int, minY: Int, maxY: Int)) -> Int {
+        var stack: [(Int, Int)] = [(x, y)]
+        var size = 0
+
+        while !stack.isEmpty {
+            let (cx, cy) = stack.removeLast()
+            let idx = cy * width + cx
+
+            guard cx >= 0, cx < width, cy >= 0, cy < height else { continue }
+            guard mask[idx] > 128 && labeled[idx] == 0 else { continue }
+
+            labeled[idx] = label
+            size += 1
+
+            // Update bounds
+            bounds.minX = min(bounds.minX, cx)
+            bounds.maxX = max(bounds.maxX, cx)
+            bounds.minY = min(bounds.minY, cy)
+            bounds.maxY = max(bounds.maxY, cy)
+
+            // Add neighbors (4-connected)
+            stack.append((cx + 1, cy))
+            stack.append((cx - 1, cy))
+            stack.append((cx, cy + 1))
+            stack.append((cx, cy - 1))
+        }
+
+        return size
     }
 
     // Helper: Flood fill for connected components
