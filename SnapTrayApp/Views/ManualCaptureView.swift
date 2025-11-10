@@ -12,6 +12,8 @@ struct ManualCaptureView: View {
     @State private var cornerWorldPositions: [simd_float3] = []  // 3D world positions (for accuracy)
     @State private var cornerScales: [CGFloat] = []  // Scale factors based on distance
     @State private var isProcessing = false
+    @State private var processingProgress: Double = 0.0
+    @State private var processingStatus: String = ""
     @State private var statusMessage = "Position camera 60-100cm above tools"
     @State private var showGuide = true
     @State private var detectionStatus = DetectionStatus()
@@ -291,6 +293,16 @@ struct ManualCaptureView: View {
                     }
                 }
                 .padding(.bottom, 40)
+            }
+
+            // Processing overlay
+            if isProcessing {
+                ProcessingView(
+                    statusMessage: processingStatus,
+                    progress: processingProgress
+                )
+                .transition(.opacity)
+                .zIndex(100) // Ensure it's on top
             }
         }
         .onAppear {
@@ -843,7 +855,8 @@ struct ManualCaptureView: View {
 
     private func performProcessing(captured: LiDARCaptureManager.CapturedFrame, plane: LiDARCaptureManager.DetectedPlane) {
         DispatchQueue.main.async {
-            self.statusMessage = "Detecting workspace..."
+            self.processingStatus = "Detecting workspace..."
+            self.processingProgress = 0.1
         }
 
         var workspaceBounds: CGRect
@@ -938,7 +951,8 @@ struct ManualCaptureView: View {
 
         // Segment tools using DEPTH DATA (not image processing!)
         DispatchQueue.main.async {
-            self.statusMessage = "Detecting tools from depth..."
+            self.processingStatus = "Analyzing depth data..."
+            self.processingProgress = 0.3
         }
 
         print("🔍 Starting tool detection...")
@@ -948,16 +962,22 @@ struct ManualCaptureView: View {
 
         let segmenter = SegmentationProcessor()
 
-        // Use depth-based segmentation - finds objects above the plane
+        // Use depth-based segmentation with progress callbacks
         let segmentation = segmenter.segmentToolsFromDepth(
             depthPoints: captured.depthData,
             plane: plane,
             cameraTransform: captured.cameraTransform,
             cameraIntrinsics: captured.cameraIntrinsics,
             imageSize: captured.image.size,
-            depthMapSize: captured.depthMapSize,  // Use actual depth map size
+            depthMapSize: captured.depthMapSize,
             workspaceBounds: workspaceBounds,
-            heightThreshold: 0.001  // 1mm above plane - VERY sensitive
+            heightThreshold: 0.001,
+            progressCallback: { status in
+                DispatchQueue.main.async {
+                    self.processingStatus = status
+                    self.processingProgress = 0.4
+                }
+            }
         )
 
         print("✅ Found \(segmentation.contours.count) contours")
@@ -966,7 +986,8 @@ struct ManualCaptureView: View {
 
         // Process geometry
         DispatchQueue.main.async {
-            self.statusMessage = "Processing geometry..."
+            self.processingStatus = "Processing geometry..."
+            self.processingProgress = 0.6
         }
 
         let geometryProcessor = GeometryProcessor()
@@ -1022,7 +1043,8 @@ struct ManualCaptureView: View {
 
         // Generate depth map visualization
         DispatchQueue.main.async {
-            self.statusMessage = "Generating depth visualization..."
+            self.processingStatus = "Creating depth map..."
+            self.processingProgress = 0.85
         }
 
         if let depthMapImage = self.generateDepthMapVisualization(
@@ -1037,7 +1059,8 @@ struct ManualCaptureView: View {
         }
 
         DispatchQueue.main.async {
-            self.statusMessage = "Done!"
+            self.processingStatus = "Complete!"
+            self.processingProgress = 1.0
         }
 
         // Clear captured frame to free memory
@@ -1045,7 +1068,7 @@ struct ManualCaptureView: View {
             self.lidarManager.capturedFrame = nil
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.isProcessing = false
             self.onCaptureDone(project)
         }

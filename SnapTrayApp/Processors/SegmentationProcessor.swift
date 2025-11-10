@@ -59,12 +59,14 @@ class SegmentationProcessor {
         imageSize: CGSize,
         depthMapSize: CGSize,
         workspaceBounds: CGRect?,
-        heightThreshold: Float = 0.005 // 5mm above plane
+        heightThreshold: Float = 0.005, // 5mm above plane
+        progressCallback: ((String) -> Void)? = nil
     ) -> SegmentationResult {
-        // SIMPLE APPROACH: Direct proportional mapping
-        // ARKit's sceneDepth is aligned with the camera view, just different resolution
-        let workingWidth = 512
-        let workingHeight = Int(512 * imageSize.height / imageSize.width)
+        progressCallback?("Analyzing depth data...")
+
+        // Use larger working size for better detail
+        let workingWidth = 1024
+        let workingHeight = Int(1024 * imageSize.height / imageSize.width)
 
         print("🎯 Depth detection setup:")
         print("   Image size: \(imageSize.width)x\(imageSize.height)")
@@ -93,9 +95,9 @@ class SegmentationProcessor {
                 let x = Int(CGFloat(point.pixelX) * scaleX)
                 let y = Int(CGFloat(point.pixelY) * scaleY)
 
-                // Fill 5x5 region for better connectivity
-                for dy in -2...2 {
-                    for dx in -2...2 {
+                // Fill 7x7 region for better connectivity
+                for dy in -3...3 {
+                    for dx in -3...3 {
                         let px = x + dx
                         let py = y + dy
                         if px >= 0 && px < workingWidth && py >= 0 && py < workingHeight {
@@ -108,13 +110,17 @@ class SegmentationProcessor {
 
         print("   Points above plane: \(pointsAbovePlane) / \(depthPoints.count) (\(Int(Double(pointsAbovePlane)/Double(max(depthPoints.count, 1))*100))%)")
 
-        // Morphological closing with larger kernel to connect fragments
-        mask = morphologicalCloseMask(mask, width: workingWidth, height: workingHeight, kernelSize: 9)
+        progressCallback?("Finding tool outlines...")
 
-        // Find connected components (very permissive)
-        let contours = extractContoursFromMaskFast(mask, width: workingWidth, height: workingHeight, minSize: 10)
+        // Morphological closing with larger kernel
+        mask = morphologicalCloseMask(mask, width: workingWidth, height: workingHeight, kernelSize: 15)
 
-        print("   Raw contours found: \(contours.count)")
+        // Use Vision framework to detect contours intelligently
+        let contours = detectContoursWithVision(mask: mask, width: workingWidth, height: workingHeight, progressCallback: progressCallback)
+
+        print("   Vision contours found: \(contours.count)")
+
+        progressCallback?("Processing geometry...")
 
         // Scale contours back to original size
         let scaleUp = imageSize.width / CGFloat(workingWidth)
@@ -133,26 +139,111 @@ class SegmentationProcessor {
 
         print("   After scaling: \(scaledContours.count)")
 
-        // Filter by workspace bounds
-        var filteredContours = scaledContours
-        if let bounds = workspaceBounds {
-            print("   Workspace bounds: \(bounds)")
-            for (i, contour) in scaledContours.enumerated() {
-                let intersects = isContourInBounds(contour, bounds: bounds)
-                print("   Contour \(i): bbox=\(contour.boundingBox), area=\(contour.area), intersects=\(intersects)")
-            }
-            filteredContours = scaledContours.filter { isContourInBounds($0, bounds: bounds) }
-            print("   After workspace filter: \(filteredContours.count)")
-        }
+        // SIMPLIFIED: Only filter by minimum area, no workspace bounds filtering
+        let minAreaPixels = 500.0 // Minimum area in pixels
+        var filteredContours = scaledContours.filter { $0.area > minAreaPixels }
 
-        // Filter by area (remove small noise) - very permissive threshold
-        let minAreaPixels = 200.0
-        filteredContours = filteredContours.filter { $0.area > minAreaPixels }
         print("   After area filter (min \(minAreaPixels)): \(filteredContours.count)")
 
         let processedImage = visualizeContours(contours: filteredContours, imageSize: imageSize)
 
         return SegmentationResult(contours: filteredContours, processedImage: processedImage)
+    }
+
+    private func detectContoursWithVision(mask: [UInt8], width: Int, height: Int, progressCallback: ((String) -> Void)?) -> [Contour] {
+        // Convert mask to CGImage
+        guard let providerRef = CGDataProvider(data: Data(mask) as CFData) else { return [] }
+
+        guard let cgImage = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 8,
+            bytesPerRow: width,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGBitmapInfo(rawValue: 0),
+            provider: providerRef,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ) else { return [] }
+
+        // Use Vision to detect contours
+        let request = VNDetectContoursRequest()
+        request.revision = VNDetectContoursRequestRevision1
+        request.contrastAdjustment = 1.0
+        request.detectsDarkOnLight = false // White objects on black background
+
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        try? handler.perform([request])
+
+        guard let observations = request.results as? [VNContoursObservation] else {
+            // Fallback to simple connected components
+            return extractContoursFromMaskFast(mask, width: width, height: height, minSize: 20)
+        }
+
+        var contours: [Contour] = []
+
+        // Convert VNContours to our Contour format
+        for observation in observations {
+            let topLevelContours = observation.topLevelContours
+
+            for vnContour in topLevelContours {
+                // Get normalized points
+                let pointCount = vnContour.pointCount
+                var points: [CGPoint] = []
+
+                // Sample points from the contour
+                let stride = max(1, pointCount / 100) // Sample up to 100 points
+                for i in stride(from: 0, to: pointCount, by: stride) {
+                    let normalizedPoint = vnContour.normalizedPoints[i]
+                    // Convert from normalized (0-1) to pixel coordinates
+                    let x = CGFloat(normalizedPoint.x) * CGFloat(width)
+                    let y = (1.0 - CGFloat(normalizedPoint.y)) * CGFloat(height) // Flip Y
+                    points.append(CGPoint(x: x, y: y))
+                }
+
+                if points.count >= 3 {
+                    let area = calculateContourArea(points)
+                    let bbox = calculateBoundingBox(points)
+
+                    // Only include reasonably sized contours
+                    if area > 100 {
+                        contours.append(Contour(points: points, area: area, boundingBox: bbox))
+                    }
+                }
+            }
+        }
+
+        return contours
+    }
+
+    private func calculateContourArea(_ points: [CGPoint]) -> Double {
+        guard points.count >= 3 else { return 0 }
+        var area: Double = 0
+        for i in 0..<points.count {
+            let j = (i + 1) % points.count
+            area += Double(points[i].x * points[j].y)
+            area -= Double(points[j].x * points[i].y)
+        }
+        return abs(area) / 2.0
+    }
+
+    private func calculateBoundingBox(_ points: [CGPoint]) -> CGRect {
+        guard !points.isEmpty else { return .zero }
+        var minX = points[0].x
+        var maxX = points[0].x
+        var minY = points[0].y
+        var maxY = points[0].y
+
+        for point in points {
+            minX = min(minX, point.x)
+            maxX = max(maxX, point.x)
+            minY = min(minY, point.y)
+            maxY = max(maxY, point.y)
+        }
+
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
     // Helper: Morphological closing on mask
