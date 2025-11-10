@@ -141,7 +141,7 @@ class SegmentationProcessor {
 
         // SIMPLIFIED: Only filter by minimum area, no workspace bounds filtering
         let minAreaPixels = 500.0 // Minimum area in pixels
-        var filteredContours = scaledContours.filter { $0.area > minAreaPixels }
+        let filteredContours = scaledContours.filter { $0.area > minAreaPixels }
 
         print("   After area filter (min \(minAreaPixels)): \(filteredContours.count)")
 
@@ -170,14 +170,13 @@ class SegmentationProcessor {
 
         // Use Vision to detect contours
         let request = VNDetectContoursRequest()
-        request.revision = VNDetectContoursRequestRevision1
         request.contrastAdjustment = 1.0
         request.detectsDarkOnLight = false // White objects on black background
 
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         try? handler.perform([request])
 
-        guard let observations = request.results as? [VNContoursObservation] else {
+        guard let observations = request.results else {
             // Fallback to simple connected components
             return extractContoursFromMaskFast(mask, width: width, height: height, minSize: 20)
         }
@@ -194,8 +193,8 @@ class SegmentationProcessor {
                 var points: [CGPoint] = []
 
                 // Sample points from the contour
-                let stride = max(1, pointCount / 100) // Sample up to 100 points
-                for i in stride(from: 0, to: pointCount, by: stride) {
+                let stepSize = max(1, pointCount / 100) // Sample up to 100 points
+                for i in Swift.stride(from: 0, to: pointCount, by: stepSize) {
                     let normalizedPoint = vnContour.normalizedPoints[i]
                     // Convert from normalized (0-1) to pixel coordinates
                     let x = CGFloat(normalizedPoint.x) * CGFloat(width)

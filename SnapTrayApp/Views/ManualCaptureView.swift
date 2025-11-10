@@ -153,52 +153,100 @@ struct ManualCaptureView: View {
 
             // UI Overlay
             VStack {
-                // Top bar
+                // Top bar with enhanced glassmorphism
                 HStack {
                     Button(action: onCancel) {
                         HStack(spacing: 8) {
                             Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 18))
                             Text("Cancel")
+                                .font(.subheadline.weight(.semibold))
                         }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding(12)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.white, .white.opacity(0.9)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                         .background(.ultraThinMaterial)
-                        .cornerRadius(12)
-                        .shadow(radius: 3)
+                        .background(Color.white.opacity(0.1))
+                        .cornerRadius(16)
+                        .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                     }
+                    .buttonStyle(ScaleButtonStyle())
 
                     Spacer()
 
-                    // Heat map toggle
-                    Button(action: { showHeatMap.toggle() }) {
-                        HStack(spacing: 6) {
+                    // Heat map toggle with gradient
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            showHeatMap.toggle()
+                        }
+                    }) {
+                        HStack(spacing: 8) {
                             Image(systemName: showHeatMap ? "circle.hexagongrid.fill" : "circle.hexagongrid")
+                                .font(.system(size: 16, weight: .semibold))
                             Text("Heat")
-                                .font(.caption)
-                                .fontWeight(.semibold)
+                                .font(.caption.weight(.bold))
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(showHeatMap ? Color.orange : Color.gray.opacity(0.3))
                         .foregroundColor(.white)
-                        .cornerRadius(8)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            Group {
+                                if showHeatMap {
+                                    LinearGradient(
+                                        colors: [Color.orange, Color.red.opacity(0.8)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                } else {
+                                    LinearGradient(
+                                        colors: [Color.gray.opacity(0.4), Color.gray.opacity(0.3)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                }
+                            }
+                        )
+                        .cornerRadius(14)
+                        .shadow(color: showHeatMap ? Color.orange.opacity(0.4) : .clear, radius: 8, y: 4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
                     }
+                    .buttonStyle(ScaleButtonStyle())
 
-                    // Mode toggle
+                    // Mode toggle with gradient
                     Button(action: toggleMode) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Image(systemName: captureMode == .manual ? "hand.tap.fill" : "viewfinder.circle.fill")
+                                .font(.system(size: 16, weight: .semibold))
                             Text(captureMode == .manual ? "Manual" : "Auto")
-                                .font(.caption)
-                                .fontWeight(.semibold)
+                                .font(.caption.weight(.bold))
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.blue)
                         .foregroundColor(.white)
-                        .cornerRadius(8)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.blue, Color.blue.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .cornerRadius(14)
+                        .shadow(color: Color.blue.opacity(0.4), radius: 8, y: 4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                        )
                     }
+                    .buttonStyle(ScaleButtonStyle())
                 }
                 .padding()
 
@@ -217,44 +265,115 @@ struct ManualCaptureView: View {
                         .transition(.scale.combined(with: .opacity))
                 }
 
-                // Status message
+                // Status message with enhanced glassmorphism
                 Text(statusMessage)
-                    .font(.subheadline)
-                    .foregroundColor(.white)
-                    .padding(12)
-                    .background(.thinMaterial)
-                    .cornerRadius(12)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.95)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 14)
+                    .background(.ultraThinMaterial)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(16)
+                    .shadow(color: .black.opacity(0.15), radius: 10, y: 5)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
                     .padding(.horizontal)
 
-                // Action buttons
+                // Action buttons with enhanced styling
                 HStack(spacing: 20) {
                     // Undo button (manual mode)
                     if captureMode == .manual && !cornerPoints.isEmpty {
                         Button(action: undoLastCorner) {
-                            VStack(spacing: 4) {
+                            VStack(spacing: 6) {
                                 Image(systemName: "arrow.uturn.backward.circle.fill")
-                                    .font(.system(size: 32))
+                                    .font(.system(size: 36))
                                 Text("Undo")
-                                    .font(.caption)
+                                    .font(.caption.weight(.semibold))
                             }
-                            .foregroundColor(.white)
-                            .padding(12)
-                            .background(.thinMaterial)
-                            .cornerRadius(12)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.white, .white.opacity(0.9)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(.ultraThinMaterial)
+                            .background(Color.white.opacity(0.05))
+                            .cornerRadius(18)
+                            .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
                         }
+                        .buttonStyle(ScaleButtonStyle())
                     }
 
-                    // Main capture/place button
+                    // Main capture/place button with enhanced glassmorphism
                     Button(action: handleMainAction) {
                         ZStack {
+                            // Outer glow ring
+                            Circle()
+                                .fill(
+                                    RadialGradient(
+                                        colors: [buttonColor.opacity(0.3), buttonColor.opacity(0)],
+                                        center: .center,
+                                        startRadius: 44,
+                                        endRadius: 60
+                                    )
+                                )
+                                .frame(width: 120, height: 120)
+
+                            // Main button background
                             Circle()
                                 .fill(.ultraThinMaterial)
                                 .frame(width: 88, height: 88)
+                                .background(
+                                    Circle()
+                                        .fill(
+                                            RadialGradient(
+                                                colors: [buttonColor.opacity(0.2), buttonColor.opacity(0.05)],
+                                                center: .center,
+                                                startRadius: 0,
+                                                endRadius: 44
+                                            )
+                                        )
+                                )
                                 .overlay(
                                     Circle()
-                                        .stroke(buttonColor, lineWidth: 4)
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [buttonColor, buttonColor.opacity(0.6)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 4
+                                        )
                                 )
-                                .shadow(radius: 8)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                        .padding(2)
+                                )
+                                .shadow(color: buttonColor.opacity(0.4), radius: 15, y: 8)
+                                .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
 
                             if isProcessing {
                                 ProgressView()
@@ -263,33 +382,56 @@ struct ManualCaptureView: View {
                             } else {
                                 VStack(spacing: 4) {
                                     Image(systemName: buttonIcon)
-                                        .font(.system(size: 28, weight: .semibold))
-                                        .foregroundColor(.white)
+                                        .font(.system(size: 30, weight: .semibold))
+                                        .foregroundStyle(
+                                            LinearGradient(
+                                                colors: [.white, .white.opacity(0.9)],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
+                                        )
                                     if captureMode == .manual && cornerPoints.count < 4 {
                                         Text("\(cornerPoints.count)/4")
                                             .font(.caption2.bold())
-                                            .foregroundColor(.white)
+                                            .foregroundColor(.white.opacity(0.9))
                                     }
                                 }
                             }
                         }
                     }
                     .disabled(isProcessing || !canCapture)
+                    .buttonStyle(ScaleButtonStyle())
+                    .scaleEffect(isProcessing ? 0.95 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isProcessing)
 
                     // Reset button (manual mode)
                     if captureMode == .manual && !cornerPoints.isEmpty {
                         Button(action: resetCorners) {
-                            VStack(spacing: 4) {
+                            VStack(spacing: 6) {
                                 Image(systemName: "arrow.clockwise.circle.fill")
-                                    .font(.system(size: 32))
+                                    .font(.system(size: 36))
                                 Text("Reset")
-                                    .font(.caption)
+                                    .font(.caption.weight(.semibold))
                             }
-                            .foregroundColor(.white)
-                            .padding(12)
-                            .background(.thinMaterial)
-                            .cornerRadius(12)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.white, .white.opacity(0.9)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(.ultraThinMaterial)
+                            .background(Color.white.opacity(0.05))
+                            .cornerRadius(18)
+                            .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
                         }
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
                 .padding(.bottom, 40)
@@ -1380,9 +1522,28 @@ struct DetectionStatusPanel: View {
                 }
             }
         }
-        .padding(12)
+        .padding(16)
         .background(.ultraThinMaterial)
-        .cornerRadius(12)
+        .background(
+            LinearGradient(
+                colors: [Color.white.opacity(0.08), Color.white.opacity(0.03)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.2), radius: 15, y: 8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+        )
     }
 
     private var guidanceText: String {
@@ -1409,22 +1570,48 @@ struct StatusBadge: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .foregroundColor(isGood ? .green : .orange)
-                .font(.system(size: 16))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: isGood ? [.green, .green.opacity(0.8)] : [.orange, .orange.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .font(.system(size: 18, weight: .semibold))
+                .shadow(color: (isGood ? .green : .orange).opacity(0.3), radius: 4)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(label)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .font(.caption2.weight(.medium))
+                    .foregroundColor(.white.opacity(0.7))
                 Text(value)
                     .font(.caption.bold())
-                    .foregroundColor(isGood ? .green : .orange)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: isGood ? [.green, .green.opacity(0.9)] : [.orange, .orange.opacity(0.9)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.black.opacity(0.2))
-        .cornerRadius(8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.black.opacity(0.25))
+        .background(.thinMaterial)
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.15), radius: 5, y: 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.2), .white.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 }
 
@@ -1434,19 +1621,31 @@ struct ManualGuideView: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
             HStack {
-                Text("Manual Corner Selection")
-                    .font(.headline)
-                    .foregroundColor(.white)
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.point.up.left.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .blue.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    Text("Manual Corner Selection")
+                        .font(.headline.weight(.semibold))
+                        .foregroundColor(.white)
+                }
                 Spacer()
                 Button(action: onDismiss) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.white.opacity(0.7))
+                        .font(.system(size: 22))
+                        .foregroundColor(.white.opacity(0.8))
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 InstructionStep(
                     number: 1,
                     text: "Align reticle with workspace corner",
@@ -1469,9 +1668,28 @@ struct ManualGuideView: View {
                 )
             }
         }
-        .padding(16)
+        .padding(20)
         .background(.ultraThinMaterial)
-        .cornerRadius(16)
+        .background(
+            LinearGradient(
+                colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.25), radius: 20, y: 10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.4), .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+        )
     }
 }
 
@@ -1481,16 +1699,29 @@ private struct InstructionStep: View {
     let isActive: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            Text("\(number).")
-                .fontWeight(.bold)
-                .foregroundColor(isActive ? .blue : .white.opacity(0.5))
-                .frame(width: 20)
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: isActive ? [.blue, .blue.opacity(0.7)] : [.white.opacity(0.15), .white.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 28, height: 28)
+                    .shadow(color: isActive ? .blue.opacity(0.4) : .clear, radius: 6)
+
+                Text("\(number)")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(isActive ? .white : .white.opacity(0.6))
+            }
 
             Text(text)
                 .foregroundColor(isActive ? .white : .white.opacity(0.7))
-                .font(isActive ? .subheadline.bold() : .subheadline)
+                .font(isActive ? .subheadline.weight(.semibold) : .subheadline.weight(.medium))
         }
+        .padding(.vertical, 4)
     }
 }
 
@@ -1619,5 +1850,15 @@ struct ARCameraViewWithHitTest: UIViewRepresentable {
             context.addLine(to: CGPoint(x: size.width, y: size.height/2))
             context.strokePath()
         }
+    }
+}
+
+// MARK: - Button Styles
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
