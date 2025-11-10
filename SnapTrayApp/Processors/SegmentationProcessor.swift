@@ -261,6 +261,12 @@ class SegmentationProcessor {
     }
 
     private func visualizeContours(contours: [Contour], imageSize: CGSize) -> UIImage? {
+        // Validate image size to prevent crash
+        guard imageSize.width > 0 && imageSize.height > 0 else {
+            print("Warning: Invalid image size (\(imageSize.width)x\(imageSize.height))")
+            return nil
+        }
+
         let renderer = UIGraphicsImageRenderer(size: imageSize)
 
         return renderer.image { context in

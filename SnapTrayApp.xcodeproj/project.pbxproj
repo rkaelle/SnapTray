@@ -25,6 +25,7 @@
 		A100000000000054 /* TutorialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000055 /* TutorialView.swift */; };
 		A100000000000056 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000057 /* SettingsView.swift */; };
 		A100000000000058 /* ImprovedCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000059 /* ImprovedCaptureView.swift */; };
+		A100000000000060 /* MarkersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000061 /* MarkersView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -48,6 +49,7 @@
 		A100000000000055 /* TutorialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialView.swift; sourceTree = "<group>"; };
 		A100000000000057 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A100000000000059 /* ImprovedCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImprovedCaptureView.swift; sourceTree = "<group>"; };
+		A100000000000061 /* MarkersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkersView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -131,6 +133,7 @@
 				A100000000000055 /* TutorialView.swift */,
 				A100000000000057 /* SettingsView.swift */,
 				A100000000000059 /* ImprovedCaptureView.swift */,
+				A100000000000061 /* MarkersView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -221,6 +224,7 @@
 				A100000000000054 /* TutorialView.swift in Sources */,
 				A100000000000056 /* SettingsView.swift in Sources */,
 				A100000000000058 /* ImprovedCaptureView.swift in Sources */,
+				A100000000000060 /* MarkersView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

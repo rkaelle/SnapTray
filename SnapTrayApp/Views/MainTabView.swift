@@ -13,26 +13,33 @@ struct MainTabView: View {
                 }
                 .tag(0)
 
+            // Markers Tab
+            MarkersView()
+                .tabItem {
+                    Label("Markers", systemImage: "qrcode")
+                }
+                .tag(1)
+
             // Projects Tab
             ProjectsView()
                 .tabItem {
                     Label("Projects", systemImage: "folder.fill")
                 }
-                .tag(1)
+                .tag(2)
 
             // Tutorial Tab
             TutorialView()
                 .tabItem {
                     Label("Tutorial", systemImage: "book.fill")
                 }
-                .tag(2)
+                .tag(3)
 
             // Settings Tab
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
-                .tag(3)
+                .tag(4)
         }
         .accentColor(.blue)
     }
@@ -50,7 +57,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack(path: $navigationPath) {
             VStack(spacing: 30) {
                 Spacer()
 
