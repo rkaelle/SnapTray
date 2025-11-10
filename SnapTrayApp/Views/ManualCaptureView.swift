@@ -535,7 +535,7 @@ struct ManualCaptureView: View {
             // Use the distance between first two corners as reference
             let worldDist1 = simd_distance(cornerWorldPositions[0], cornerWorldPositions[1])
             let worldDist2 = simd_distance(cornerWorldPositions[1], cornerWorldPositions[2])
-            let avgWorldWidth = (worldDist1 + worldDist2) / 2.0  // meters
+            let avgWorldWidth = Double(worldDist1 + worldDist2) / 2.0  // meters, converted to Double
 
             let pixelDist1 = distance(projectedCorners[0], projectedCorners[1])
             let pixelDist2 = distance(projectedCorners[1], projectedCorners[2])
