@@ -95,6 +95,34 @@ struct ConfirmView: View {
                                 .padding(.horizontal)
                         }
                     }
+
+                    // Depth map visualization
+                    if let depthData = project.depthMap,
+                       let depthImage = UIImage(data: depthData) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Depth Map")
+                                    .font(.headline)
+                                Spacer()
+                                HStack(spacing: 8) {
+                                    // Legend
+                                    DepthLegend()
+                                }
+                            }
+                            .padding(.horizontal)
+
+                            Image(uiImage: depthImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .cornerRadius(12)
+                                .padding(.horizontal)
+
+                            Text("Color represents height above plane: Blue (low) → Green → Yellow → Red (high)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal)
+                        }
+                    }
                 }
                 .padding(.vertical)
             }
@@ -431,6 +459,24 @@ struct TraySettingsView: View {
             .navigationBarItems(trailing: Button("Done") {
                 dismiss()
             })
+        }
+    }
+}
+
+// MARK: - Depth Legend
+struct DepthLegend: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach([(Color.blue, "Low"), (Color.cyan, ""), (Color.green, ""), (Color.yellow, ""), (Color.red, "High")], id: \.0) { item in
+                if !item.1.isEmpty {
+                    Text(item.1)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(item.0)
+                    .frame(width: 12, height: 12)
+            }
         }
     }
 }

@@ -1020,6 +1020,22 @@ struct ManualCaptureView: View {
             project.capturedImage = imageData
         }
 
+        // Generate depth map visualization
+        DispatchQueue.main.async {
+            self.statusMessage = "Generating depth visualization..."
+        }
+
+        if let depthMapImage = self.generateDepthMapVisualization(
+            depthPoints: captured.depthData,
+            plane: plane,
+            imageSize: captured.image.size,
+            depthMapSize: captured.depthMapSize
+        ) {
+            if let depthMapData = depthMapImage.jpegData(compressionQuality: 0.9) {
+                project.depthMap = depthMapData
+            }
+        }
+
         DispatchQueue.main.async {
             self.statusMessage = "Done!"
         }
@@ -1032,6 +1048,119 @@ struct ManualCaptureView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.isProcessing = false
             self.onCaptureDone(project)
+        }
+    }
+
+    private func generateDepthMapVisualization(
+        depthPoints: [LiDARCaptureManager.DepthPoint],
+        plane: LiDARCaptureManager.DetectedPlane,
+        imageSize: CGSize,
+        depthMapSize: CGSize
+    ) -> UIImage? {
+        let width = Int(imageSize.width)
+        let height = Int(imageSize.height)
+
+        // Create pixel buffer for depth visualization
+        var pixels = [UInt8](repeating: 0, count: width * height * 4) // RGBA
+
+        // Find min/max heights above plane for color mapping
+        var minHeight: Float = Float.infinity
+        var maxHeight: Float = -Float.infinity
+
+        for point in depthPoints {
+            let pointToPlane = point.position - plane.center
+            let distance = simd_dot(pointToPlane, plane.normal)
+            if distance > 0 {
+                minHeight = min(minHeight, distance)
+                maxHeight = max(maxHeight, distance)
+            }
+        }
+
+        // If no points above plane, return nil
+        guard minHeight != Float.infinity else { return nil }
+
+        let heightRange = max(maxHeight - minHeight, 0.001) // Avoid divide by zero
+
+        // Scale from depth map to image coordinates
+        let scaleX = imageSize.width / depthMapSize.width
+        let scaleY = imageSize.height / depthMapSize.height
+
+        // Map each depth point to a pixel with color based on height
+        for point in depthPoints {
+            let pointToPlane = point.position - plane.center
+            let distance = simd_dot(pointToPlane, plane.normal)
+
+            if distance > 0 {
+                // Normalize height to 0-1 range
+                let normalizedHeight = (distance - minHeight) / heightRange
+
+                // Convert to heat map color (blue -> green -> yellow -> red)
+                let (r, g, b) = heightToColor(normalizedHeight: CGFloat(normalizedHeight))
+
+                // Map to pixel coordinates using proportional scaling
+                let x = Int(CGFloat(point.pixelX) * scaleX)
+                let y = Int(CGFloat(point.pixelY) * scaleY)
+
+                // Fill 3x3 region for better visibility
+                for dy in -1...1 {
+                    for dx in -1...1 {
+                        let px = x + dx
+                        let py = y + dy
+
+                        if px >= 0 && px < width && py >= 0 && py < height {
+                            let pixelIndex = (py * width + px) * 4
+                            if pixelIndex + 3 < pixels.count {
+                                pixels[pixelIndex] = UInt8(r * 255)
+                                pixels[pixelIndex + 1] = UInt8(g * 255)
+                                pixels[pixelIndex + 2] = UInt8(b * 255)
+                                pixels[pixelIndex + 3] = 255 // Alpha
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Create CGImage from pixel data
+        guard let providerRef = CGDataProvider(data: Data(pixels) as CFData) else { return nil }
+
+        guard let cgImage = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: providerRef,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ) else { return nil }
+
+        return UIImage(cgImage: cgImage)
+    }
+
+    private func heightToColor(normalizedHeight: CGFloat) -> (CGFloat, CGFloat, CGFloat) {
+        // Heat map: Blue (low) -> Cyan -> Green -> Yellow -> Red (high)
+        let h = max(0, min(1, normalizedHeight))
+
+        if h < 0.25 {
+            // Blue to Cyan
+            let t = h / 0.25
+            return (0, t, 1)
+        } else if h < 0.5 {
+            // Cyan to Green
+            let t = (h - 0.25) / 0.25
+            return (0, 1, 1 - t)
+        } else if h < 0.75 {
+            // Green to Yellow
+            let t = (h - 0.5) / 0.25
+            return (t, 1, 0)
+        } else {
+            // Yellow to Red
+            let t = (h - 0.75) / 0.25
+            return (1, 1 - t, 0)
         }
     }
 }
