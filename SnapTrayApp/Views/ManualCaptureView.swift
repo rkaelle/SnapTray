@@ -604,7 +604,7 @@ struct ManualGuideView: View {
     }
 }
 
-struct InstructionStep: View {
+private struct InstructionStep: View {
     let number: Int
     let text: String
     let isActive: Bool

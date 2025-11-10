@@ -418,7 +418,7 @@ struct FileCard: View {
     }
 }
 
-struct InstructionStep: View {
+private struct InstructionStep: View {
     let number: Int
     let text: String
 
