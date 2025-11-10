@@ -142,15 +142,13 @@ struct HomeView: View {
             }
             .navigationTitle("SnapTray")
             .sheet(isPresented: $showingCapture) {
-                NavigationView {
-                    CaptureView(onCaptureDone: { project in
-                        showingCapture = false
-                        currentProject = project
-                        navigationPath.append(.confirm(project))
-                    }, onCancel: {
-                        showingCapture = false
-                    })
-                }
+                ManualCaptureView(onCaptureDone: { project in
+                    showingCapture = false
+                    currentProject = project
+                    navigationPath.append(.confirm(project))
+                }, onCancel: {
+                    showingCapture = false
+                })
             }
             .navigationDestination(for: NavigationDestination.self) { destination in
                 switch destination {
