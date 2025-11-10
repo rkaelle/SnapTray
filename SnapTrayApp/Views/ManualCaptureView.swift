@@ -1115,7 +1115,11 @@ struct DetectionStatusPanel: View {
     let mode: ManualCaptureView.CaptureMode
 
     var body: some View {
-        VStack(spacing: 8) {
+        let distanceGood = status.distanceToPlane >= 60 && status.distanceToPlane <= 100
+        let angleGood = status.angleToPlane < 15
+        let pointsGood = status.pointsAbovePlane > 20
+
+        return VStack(spacing: 8) {
             // First row: Plane and markers (if auto mode)
             HStack(spacing: 12) {
                 StatusBadge(
@@ -1139,7 +1143,6 @@ struct DetectionStatusPanel: View {
             if status.planeDetected {
                 HStack(spacing: 12) {
                     // Distance
-                    let distanceGood = status.distanceToPlane >= 60 && status.distanceToPlane <= 100
                     StatusBadge(
                         icon: "arrow.up.and.down",
                         label: "Distance",
@@ -1148,7 +1151,6 @@ struct DetectionStatusPanel: View {
                     )
 
                     // Angle
-                    let angleGood = status.angleToPlane < 15
                     StatusBadge(
                         icon: "angle",
                         label: "Angle",
@@ -1157,7 +1159,6 @@ struct DetectionStatusPanel: View {
                     )
 
                     // Points above plane
-                    let pointsGood = status.pointsAbovePlane > 20
                     StatusBadge(
                         icon: "circle.hexagongrid.fill",
                         label: "Objects",
