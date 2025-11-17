@@ -114,8 +114,8 @@ struct ProcessingPageView: View {
             }
             .padding()
         }
-        .onChange(of: progress) { newProgress in
-            if newProgress >= 1.0 {
+        .onChange(of: progress) { oldValue, newValue in
+            if newValue >= 1.0 {
                 // Small delay to show 100% before completing
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     onComplete()
