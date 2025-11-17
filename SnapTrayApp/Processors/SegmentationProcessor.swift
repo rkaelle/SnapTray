@@ -110,10 +110,12 @@ class SegmentationProcessor {
 
         print("   Points above plane: \(pointsAbovePlane) / \(depthPoints.count) (\(Int(Double(pointsAbovePlane)/Double(max(depthPoints.count, 1))*100))%)")
 
-        progressCallback?("Finding tool outlines...")
+        progressCallback?("Applying morphological operations...")
 
         // Morphological closing with larger kernel
         mask = morphologicalCloseMask(mask, width: workingWidth, height: workingHeight, kernelSize: 15)
+
+        progressCallback?("Starting contour detection...")
 
         // Use Vision framework to detect contours intelligently
         let contours = detectContoursWithVision(mask: mask, width: workingWidth, height: workingHeight, progressCallback: progressCallback)
@@ -151,6 +153,8 @@ class SegmentationProcessor {
     }
 
     private func detectContoursWithVision(mask: [UInt8], width: Int, height: Int, progressCallback: ((String) -> Void)?) -> [Contour] {
+        progressCallback?("Creating contour image...")
+
         // Convert mask to CGImage
         guard let providerRef = CGDataProvider(data: Data(mask) as CFData) else { return [] }
 
@@ -168,6 +172,8 @@ class SegmentationProcessor {
             intent: .defaultIntent
         ) else { return [] }
 
+        progressCallback?("Detecting contours with Vision framework...")
+
         // Use Vision to detect contours
         let request = VNDetectContoursRequest()
         request.contrastAdjustment = 1.0
@@ -176,15 +182,24 @@ class SegmentationProcessor {
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         try? handler.perform([request])
 
+        progressCallback?("Processing detected contours...")
+
         guard let observations = request.results else {
             // Fallback to simple connected components
+            progressCallback?("Using fallback contour detection...")
             return extractContoursFromMaskFast(mask, width: width, height: height, minSize: 20)
         }
 
         var contours: [Contour] = []
+        let totalObservations = observations.count
 
         // Convert VNContours to our Contour format
-        for observation in observations {
+        for (obsIndex, observation) in observations.enumerated() {
+            if obsIndex % 5 == 0 {
+                let progress = Int((Float(obsIndex) / Float(max(totalObservations, 1))) * 100)
+                progressCallback?("Converting contours... \(progress)%")
+            }
+
             let topLevelContours = observation.topLevelContours
 
             for vnContour in topLevelContours {
@@ -214,6 +229,7 @@ class SegmentationProcessor {
             }
         }
 
+        progressCallback?("Contour detection complete!")
         return contours
     }
 
