@@ -14,6 +14,8 @@ struct ManualCaptureView: View {
     @State private var isProcessing = false
     @State private var processingProgress: Double = 0.0
     @State private var processingStatus: String = ""
+    @State private var navigateToProcessing = false  // Navigation trigger for processing page
+    @State private var completedProject: Project?  // Store completed project for handoff
     @State private var statusMessage = "Position camera 60-100cm above tools"
     @State private var showGuide = true
     @State private var detectionStatus = DetectionStatus()
@@ -47,7 +49,33 @@ struct ManualCaptureView: View {
     }
 
     var body: some View {
+        NavigationView {
+            mainCaptureView
+        }
+        .navigationViewStyle(StackNavigationViewStyle())
+        .navigationBarHidden(true)
+    }
+
+    private var mainCaptureView: some View {
         ZStack {
+            // Navigation link to processing page (hidden, triggered programmatically)
+            NavigationLink(
+                destination: ProcessingPageView(
+                    statusMessage: $processingStatus,
+                    progress: $processingProgress,
+                    onComplete: {
+                        // When processing completes, call the done handler
+                        if let project = completedProject {
+                            onCaptureDone(project)
+                        }
+                    }
+                ),
+                isActive: $navigateToProcessing
+            ) {
+                EmptyView()
+            }
+            .hidden()
+
             // AR View
             ARCameraViewWithHitTest(
                 lidarManager: lidarManager,
@@ -434,16 +462,6 @@ struct ManualCaptureView: View {
                 }
                 .padding(.bottom, 40)
             }
-
-            // Processing overlay
-            if isProcessing {
-                ProcessingView(
-                    statusMessage: processingStatus,
-                    progress: processingProgress
-                )
-                .transition(AnyTransition.opacity)
-                .zIndex(100) // Ensure it's on top
-            }
         }
         .onAppear {
             lidarManager.startSession()
@@ -682,10 +700,11 @@ struct ManualCaptureView: View {
         // Invalidate any existing timer
         detectionTimer?.invalidate()
 
-        // Create new timer and store it - runs frequently for smooth point tracking
+        // Create new timer and store it - runs at 10Hz (100ms) for better performance
         var lastMarkerCheck = Date()
+        var lastHeatMapUpdate = Date()
 
-        detectionTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { [self] timer in
+        detectionTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [self] timer in
             guard !isProcessing else { return }
 
             // Get current AR frame - DO NOT STORE IT, just use it immediately
@@ -717,13 +736,15 @@ struct ManualCaptureView: View {
                         let angleRad = acos(abs(simd_dot(cameraForward, plane.normal)))
                         self.detectionStatus.angleToPlane = angleRad * 180.0 / .pi
 
-                        // Count points above plane
-                        if let sceneDepth = frame.sceneDepth {
-                            self.detectionStatus.pointsAbovePlane = self.countPointsAbovePlane(
-                                frame: frame,
-                                plane: plane,
-                                sceneDepth: sceneDepth
-                            )
+                        // Count points above plane (only update occasionally)
+                        if Date().timeIntervalSince(lastHeatMapUpdate) > 0.3 {
+                            if let sceneDepth = frame.sceneDepth {
+                                self.detectionStatus.pointsAbovePlane = self.countPointsAbovePlane(
+                                    frame: frame,
+                                    plane: plane,
+                                    sceneDepth: sceneDepth
+                                )
+                            }
                         }
                     }
 
@@ -732,10 +753,11 @@ struct ManualCaptureView: View {
                         self.updateCornerProjections(frame: frame)
                     }
 
-                    // Update heat map every frame if enabled
-                    if self.showHeatMap {
+                    // Update heat map every 0.3 seconds (instead of every frame) for better performance
+                    if self.showHeatMap && Date().timeIntervalSince(lastHeatMapUpdate) > 0.3 {
+                        lastHeatMapUpdate = Date()
                         self.updateHeatMap(frame: frame)
-                    } else {
+                    } else if !self.showHeatMap {
                         self.heatMapPoints.removeAll()
                     }
 
@@ -968,7 +990,10 @@ struct ManualCaptureView: View {
 
     private func performCapture() {
         isProcessing = true
-        statusMessage = "Processing scan..."
+        statusMessage = "Preparing scan..."
+
+        // Navigate to processing page
+        navigateToProcessing = true
 
         lidarManager.captureFrame()
 
@@ -1100,23 +1125,44 @@ struct ManualCaptureView: View {
         }
 
         // SENSOR FUSION: Blend RGB camera with LiDAR depth for enhanced accuracy
-        // Note: Temporarily using raw LiDAR until SensorFusionProcessor is added to Xcode target
         DispatchQueue.main.async {
-            self.processingStatus = "Analyzing LiDAR depth data..."
+            self.processingStatus = "Initializing sensor fusion..."
             self.processingProgress = 0.15
         }
 
-        print("🔍 Starting tool detection...")
+        print("🔍 Starting sensor fusion...")
         print("   Depth points: \(captured.depthData.count)")
         print("   Depth map size: \(captured.depthMapSize)")
         print("   Image size: \(captured.image.size)")
 
-        // Use raw depth data (sensor fusion will be enabled once SensorFusionProcessor is added to target)
-        let depthPointsToUse = captured.depthData
+        // Use SensorFusionProcessor to enhance depth with RGB edges
+        let fusionProcessor = SensorFusionProcessor()
+        let fusedResult = fusionProcessor.fuseRGBWithDepth(
+            rgbImage: captured.image,
+            depthPoints: captured.depthData,
+            depthMapSize: captured.depthMapSize,
+            imageSize: captured.image.size,
+            minDepthChange: 0.005  // 5mm sensitivity for edge detection
+        )
 
-        // Segment tools using depth data
         DispatchQueue.main.async {
-            self.processingStatus = "Detecting tools from depth map..."
+            self.processingStatus = "Sensor fusion complete - using enhanced depth..."
+            self.processingProgress = 0.20
+        }
+
+        // Use enhanced depth points if available, otherwise fall back to raw LiDAR
+        let depthPointsToUse: [LiDARCaptureManager.DepthPoint]
+        if let fusedData = fusedResult {
+            print("   ✅ Sensor fusion successful - using \(fusedData.depthPoints.count) enhanced points")
+            depthPointsToUse = fusionProcessor.convertToStandardDepthPoints(fusedData.depthPoints)
+        } else {
+            print("   ⚠️ Sensor fusion failed - using raw LiDAR depth")
+            depthPointsToUse = captured.depthData
+        }
+
+        // Segment tools using enhanced depth data
+        DispatchQueue.main.async {
+            self.processingStatus = "Detecting tool outlines..."
             self.processingProgress = 0.25
         }
 
@@ -1124,7 +1170,8 @@ struct ManualCaptureView: View {
 
         let segmenter = SegmentationProcessor()
 
-        // Use depth-based segmentation with progress callbacks
+        // Use depth-based segmentation with detailed progress callbacks
+        var lastProgress: Double = 0.25
         let segmentation = segmenter.segmentToolsFromDepth(
             depthPoints: depthPointsToUse,
             plane: plane,
@@ -1137,8 +1184,9 @@ struct ManualCaptureView: View {
             progressCallback: { status in
                 DispatchQueue.main.async {
                     self.processingStatus = status
-                    // Map to progress range 0.25 - 0.5
-                    self.processingProgress = 0.25 + (0.25 * 0.5)  // Increment within range
+                    // Gradually increment progress from 0.25 to 0.50
+                    lastProgress = min(0.50, lastProgress + 0.02)
+                    self.processingProgress = lastProgress
                 }
             }
         )
@@ -1158,10 +1206,10 @@ struct ManualCaptureView: View {
 
         for (index, contour) in scaledContours.enumerated() {
             autoreleasepool {
-                // Update progress for each tool
-                let toolProgress = 0.5 + (0.3 * Double(index) / Double(max(scaledContours.count, 1)))
+                // Update progress smoothly for each tool (0.50 -> 0.75)
+                let toolProgress = 0.50 + (0.25 * Double(index) / Double(max(scaledContours.count, 1)))
                 DispatchQueue.main.async {
-                    self.processingStatus = "Processing tool \(index + 1) of \(scaledContours.count)..."
+                    self.processingStatus = "Refining tool \(index + 1) of \(scaledContours.count)..."
                     self.processingProgress = toolProgress
                 }
 
@@ -1199,7 +1247,7 @@ struct ManualCaptureView: View {
 
         DispatchQueue.main.async {
             self.processingStatus = "Saving project data..."
-            self.processingProgress = 0.8
+            self.processingProgress = 0.75
         }
 
         // Use filename-safe date format (no slashes)
@@ -1218,8 +1266,8 @@ struct ManualCaptureView: View {
 
         // OPTIMIZED: Generate depth map with faster single-pass algorithm
         DispatchQueue.main.async {
-            self.processingStatus = "Generating depth visualization..."
-            self.processingProgress = 0.9
+            self.processingStatus = "Creating depth visualization..."
+            self.processingProgress = 0.80
         }
 
         if let depthMapImage = self.generateOptimizedDepthMapVisualization(
@@ -1234,18 +1282,21 @@ struct ManualCaptureView: View {
         }
 
         DispatchQueue.main.async {
+            self.processingStatus = "Finalizing..."
+            self.processingProgress = 0.90
+        }
+
+        // Smooth progress to 100%
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             self.processingStatus = "Complete!"
             self.processingProgress = 1.0
-        }
 
-        // Clear captured frame to free memory
-        DispatchQueue.main.async {
+            // Store completed project
+            self.completedProject = project
+
+            // Clear captured frame to free memory
             self.lidarManager.capturedFrame = nil
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.isProcessing = false
-            self.onCaptureDone(project)
         }
     }
 
