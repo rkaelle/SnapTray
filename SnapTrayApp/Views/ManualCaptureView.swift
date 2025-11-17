@@ -49,32 +49,31 @@ struct ManualCaptureView: View {
     }
 
     var body: some View {
-        NavigationView {
-            mainCaptureView
-        }
-        .navigationViewStyle(StackNavigationViewStyle())
-        .navigationBarHidden(true)
-    }
-
-    private var mainCaptureView: some View {
         ZStack {
-            // Navigation link to processing page (hidden, triggered programmatically)
-            NavigationLink(
-                destination: ProcessingPageView(
+            // Main capture interface
+            mainCaptureView
+
+            // Full screen processing overlay when processing
+            if navigateToProcessing {
+                ProcessingPageView(
                     statusMessage: $processingStatus,
                     progress: $processingProgress,
                     onComplete: {
                         // When processing completes, call the done handler
+                        navigateToProcessing = false
                         if let project = completedProject {
                             onCaptureDone(project)
                         }
                     }
-                ),
-                isActive: $navigateToProcessing
-            ) {
-                EmptyView()
+                )
+                .transition(.opacity)
+                .zIndex(100)
             }
-            .hidden()
+        }
+    }
+
+    private var mainCaptureView: some View {
+        ZStack {
 
             // AR View
             ARCameraViewWithHitTest(
