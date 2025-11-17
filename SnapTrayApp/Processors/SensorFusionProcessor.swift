@@ -3,6 +3,7 @@ import Vision
 import CoreImage
 import Accelerate
 import simd
+import ARKit
 
 /// Implements RGB-D sensor fusion to blend camera visual data with LiDAR depth data
 /// for enhanced depth perception and accuracy. Uses edge-aware interpolation to
