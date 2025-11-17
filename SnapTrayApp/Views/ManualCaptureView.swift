@@ -24,7 +24,7 @@ struct ManualCaptureView: View {
     @State private var detectionTimer: Timer?
     @State private var detectedArucoMarkers: [DetectedArucoMarker] = []
     @State private var heatMapPoints: [CGPoint] = []  // Points above plane for heat map visualization
-    @State private var showHeatMap = true  // Toggle heat map visibility
+    // Heat map removed - was not working properly
 
     enum CaptureMode {
         case manual      // User taps to place corners
@@ -160,15 +160,7 @@ struct ManualCaptureView: View {
                     }
                 }
 
-                // Heat map overlay - visualize points above plane
-                if showHeatMap && !heatMapPoints.isEmpty {
-                    ForEach(Array(heatMapPoints.enumerated()), id: \.offset) { _, point in
-                        Circle()
-                            .fill(Color.orange.opacity(0.6))
-                            .frame(width: 4, height: 4)
-                            .position(point)
-                    }
-                }
+                // Heat map removed - was not working properly and cluttered the view
             }
             .allowsHitTesting(false)
 
@@ -207,47 +199,6 @@ struct ManualCaptureView: View {
                         .buttonStyle(ScaleButtonStyle())
 
                         Spacer()
-
-                        // Heat map toggle with gradient
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                showHeatMap.toggle()
-                            }
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: showHeatMap ? "circle.hexagongrid.fill" : "circle.hexagongrid")
-                                    .font(.system(size: 14, weight: .semibold))
-                                Text("Heat")
-                                    .font(.caption2.weight(.bold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                Group {
-                                    if showHeatMap {
-                                        LinearGradient(
-                                            colors: [Color.orange, Color.red.opacity(0.8)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    } else {
-                                        LinearGradient(
-                                            colors: [Color.gray.opacity(0.4), Color.gray.opacity(0.3)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    }
-                                }
-                            )
-                            .cornerRadius(10)
-                            .shadow(color: showHeatMap ? Color.orange.opacity(0.4) : .clear, radius: 8, y: 4)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(ScaleButtonStyle())
 
                         // Mode toggle with gradient
                         Button(action: toggleMode) {
@@ -701,7 +652,6 @@ struct ManualCaptureView: View {
 
         // Create new timer and store it - runs at 10Hz (100ms) for better performance
         var lastMarkerCheck = Date()
-        var lastHeatMapUpdate = Date()
 
         detectionTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [self] timer in
             guard !isProcessing else { return }
@@ -750,14 +700,6 @@ struct ManualCaptureView: View {
                     // Update corner point projections if we have placed points
                     if !self.cornerWorldPositions.isEmpty {
                         self.updateCornerProjections(frame: frame)
-                    }
-
-                    // Update heat map every 0.3 seconds (instead of every frame) for better performance
-                    if self.showHeatMap && Date().timeIntervalSince(lastHeatMapUpdate) > 0.3 {
-                        lastHeatMapUpdate = Date()
-                        self.updateHeatMap(frame: frame)
-                    } else if !self.showHeatMap {
-                        self.heatMapPoints.removeAll()
                     }
 
                     // Check for ArUco markers every 0.5 seconds in automatic mode
@@ -858,80 +800,7 @@ struct ManualCaptureView: View {
         return count
     }
 
-    private func updateHeatMap(frame: ARFrame) {
-        guard let plane = lidarManager.detectedPlane,
-              let sceneDepth = frame.sceneDepth else {
-            heatMapPoints.removeAll()
-            return
-        }
-
-        let depthMap = sceneDepth.depthMap
-        let depthWidth = CVPixelBufferGetWidth(depthMap)
-        let depthHeight = CVPixelBufferGetHeight(depthMap)
-
-        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
-
-        guard let depthData = CVPixelBufferGetBaseAddress(depthMap) else {
-            heatMapPoints.removeAll()
-            return
-        }
-
-        let depthPointer = depthData.assumingMemoryBound(to: Float32.self)
-        let rowBytes = CVPixelBufferGetBytesPerRow(depthMap)
-        let floatsPerRow = rowBytes / MemoryLayout<Float32>.stride
-
-        var points: [CGPoint] = []
-        let heightThreshold: Float = 0.001  // 1mm above plane - very sensitive
-
-        // Sample every 4th pixel for good coverage
-        let stepSize = 4
-
-        for y in Swift.stride(from: 0, to: depthHeight, by: stepSize) {
-            for x in Swift.stride(from: 0, to: depthWidth, by: stepSize) {
-                let depth = depthPointer[y * floatsPerRow + x]
-                guard depth > 0 && depth < 5.0 else { continue }
-
-                // Convert depth pixel to 3D world position using ARKit
-                let normalizedX = Float(x) / Float(depthWidth - 1)
-                let normalizedY = Float(y) / Float(depthHeight - 1)
-
-                let viewportPoint = CGPoint(x: CGFloat(normalizedX), y: CGFloat(normalizedY))
-                guard let ray = frame.camera.unprojectPoint(
-                    viewportPoint,
-                    ontoPlane: matrix_identity_float4x4,
-                    orientation: .portrait,
-                    viewportSize: CGSize(width: depthWidth, height: depthHeight)
-                ) else {
-                    continue
-                }
-
-                let worldPosition = ray * depth
-
-                // Check if point is above plane
-                let pointToPlane = worldPosition - plane.center
-                let distanceAbovePlane = simd_dot(pointToPlane, plane.normal)
-
-                if distanceAbovePlane > heightThreshold {
-                    // Project 3D world position to screen using proper view/projection matrices
-                    if let screenPos = projectToScreen(worldPosition: worldPosition, frame: frame) {
-                        // Only add if within screen bounds
-                        if screenPos.x >= 0 && screenPos.x <= screenSize.width &&
-                           screenPos.y >= 0 && screenPos.y <= screenSize.height {
-                            points.append(screenPos)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Limit to reasonable number for performance
-        if points.count > 3000 {
-            points = Array(points.prefix(3000))
-        }
-
-        heatMapPoints = points
-    }
+    // Heat map function removed - feature was not working properly
 
     private func checkForArucoMarkersLive() {
         // Get current frame for detection
@@ -1259,7 +1128,9 @@ struct ManualCaptureView: View {
         project.workspaceBounds = workspaceBounds
         project.pixelToMMScale = pixelToMMScale
 
-        if let imageData = captured.image.jpegData(compressionQuality: 0.8) {
+        // Crop captured image to workspace bounds for cleaner output
+        let croppedImage = cropImageToWorkspace(captured.image, workspaceBounds: workspaceBounds)
+        if let imageData = croppedImage.jpegData(compressionQuality: 0.8) {
             project.capturedImage = imageData
         }
 
@@ -1273,7 +1144,8 @@ struct ManualCaptureView: View {
             depthPoints: captured.depthData,
             plane: plane,
             imageSize: captured.image.size,
-            depthMapSize: captured.depthMapSize
+            depthMapSize: captured.depthMapSize,
+            workspaceBounds: workspaceBounds
         ) {
             if let depthMapData = depthMapImage.jpegData(compressionQuality: 0.85) {
                 project.depthMap = depthMapData
@@ -1445,7 +1317,8 @@ struct ManualCaptureView: View {
         depthPoints: [LiDARCaptureManager.DepthPoint],
         plane: LiDARCaptureManager.DetectedPlane,
         imageSize: CGSize,
-        depthMapSize: CGSize
+        depthMapSize: CGSize,
+        workspaceBounds: CGRect? = nil
     ) -> UIImage? {
         // Use more reasonable resolution for faster processing
         let targetWidth = 800  // Reduced from 1024 for speed
@@ -1476,7 +1349,22 @@ struct ManualCaptureView: View {
         let sparseHeight = Int(depthMapSize.height)
         var sparseDepth = [Float](repeating: -1, count: sparseWidth * sparseHeight)
 
-        // Fill sparse depth map
+        // Scale workspace bounds to depth map size for filtering
+        let scaledWorkspaceBounds: CGRect?
+        if let bounds = workspaceBounds {
+            let scaleX = depthMapSize.width / imageSize.width
+            let scaleY = depthMapSize.height / imageSize.height
+            scaledWorkspaceBounds = CGRect(
+                x: bounds.origin.x * scaleX,
+                y: bounds.origin.y * scaleY,
+                width: bounds.width * scaleX,
+                height: bounds.height * scaleY
+            )
+        } else {
+            scaledWorkspaceBounds = nil
+        }
+
+        // Fill sparse depth map - only within workspace bounds
         for point in depthPoints {
             let pointToPlane = point.position - plane.center
             let distance = simd_dot(pointToPlane, plane.normal)
@@ -1484,6 +1372,15 @@ struct ManualCaptureView: View {
             if distance > 0 {
                 let x = point.pixelX
                 let y = point.pixelY
+
+                // Filter by workspace bounds if provided
+                if let bounds = scaledWorkspaceBounds {
+                    let pointInBounds = CGPoint(x: CGFloat(x), y: CGFloat(y))
+                    guard bounds.contains(pointInBounds) else {
+                        continue
+                    }
+                }
+
                 if x >= 0 && x < sparseWidth && y >= 0 && y < sparseHeight {
                     sparseDepth[y * sparseWidth + x] = distance
                 }
@@ -1554,6 +1451,32 @@ struct ManualCaptureView: View {
         ) else { return nil }
 
         return UIImage(cgImage: cgImage)
+    }
+
+    private func cropImageToWorkspace(_ image: UIImage, workspaceBounds: CGRect) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+
+        // Ensure bounds are within image bounds
+        let imageBounds = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
+        let clampedBounds = workspaceBounds.intersection(imageBounds)
+
+        guard !clampedBounds.isEmpty else { return image }
+
+        // Convert from UIImage coordinates to CGImage coordinates (may need scaling for retina)
+        let scale = image.scale
+        let cropRect = CGRect(
+            x: clampedBounds.origin.x * scale,
+            y: clampedBounds.origin.y * scale,
+            width: clampedBounds.width * scale,
+            height: clampedBounds.height * scale
+        )
+
+        // Crop the image
+        if let croppedCGImage = cgImage.cropping(to: cropRect) {
+            return UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: image.imageOrientation)
+        }
+
+        return image
     }
 
     private func heightToColor(normalizedHeight: CGFloat) -> (CGFloat, CGFloat, CGFloat) {
