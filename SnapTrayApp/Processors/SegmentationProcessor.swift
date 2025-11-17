@@ -3,6 +3,7 @@ import Vision
 import CoreImage
 import Accelerate
 import simd
+import ARKit
 
 class SegmentationProcessor {
     struct SegmentationResult {
@@ -64,8 +65,8 @@ class SegmentationProcessor {
     ) -> SegmentationResult {
         progressCallback?("Analyzing depth data...")
 
-        // Use smaller working size for faster processing
-        let workingWidth = 800  // Reduced from 1024
+        // Use working size that matches image aspect ratio
+        let workingWidth = 800
         let workingHeight = Int(800 * imageSize.height / imageSize.width)
 
         print("🎯 Depth detection setup:")
@@ -74,63 +75,80 @@ class SegmentationProcessor {
         print("   Depth map: \(depthMapSize.width)x\(depthMapSize.height)")
         print("   Height threshold: \(heightThreshold)m")
         print("   Workspace bounds: \(workspaceBounds?.debugDescription ?? "none")")
+        print("   Total depth points: \(depthPoints.count)")
 
         var mask = [UInt8](repeating: 0, count: workingWidth * workingHeight)
         var pointsAbovePlane = 0
         var pointsInWorkspace = 0
+        var projectionFailures = 0
 
-        // Direct proportional scale from depth map to working image
-        let scaleX = CGFloat(workingWidth) / depthMapSize.width
-        let scaleY = CGFloat(workingHeight) / depthMapSize.height
+        // Scale from image coordinates to working coordinates
+        let imageToWorkingScaleX = CGFloat(workingWidth) / imageSize.width
+        let imageToWorkingScaleY = CGFloat(workingHeight) / imageSize.height
 
-        // Scale workspace bounds to working size
+        // Scale workspace bounds to working size (if provided)
         let scaledWorkspaceBounds: CGRect?
         if let bounds = workspaceBounds {
-            let boundsScaleX = CGFloat(workingWidth) / imageSize.width
-            let boundsScaleY = CGFloat(workingHeight) / imageSize.height
             scaledWorkspaceBounds = CGRect(
-                x: bounds.origin.x * boundsScaleX,
-                y: bounds.origin.y * boundsScaleY,
-                width: bounds.width * boundsScaleX,
-                height: bounds.height * boundsScaleY
+                x: bounds.origin.x * imageToWorkingScaleX,
+                y: bounds.origin.y * imageToWorkingScaleY,
+                width: bounds.width * imageToWorkingScaleX,
+                height: bounds.height * imageToWorkingScaleY
             )
-            print("   Scaled workspace: \(scaledWorkspaceBounds!)")
+            print("   Scaled workspace bounds: \(scaledWorkspaceBounds!)")
         } else {
             scaledWorkspaceBounds = nil
         }
 
-        print("   Scale factors: X=\(scaleX), Y=\(scaleY)")
-
+        // Process each depth point by projecting its 3D position to image coordinates
         for point in depthPoints {
             // Calculate distance from point to plane
             let pointToPlane = point.position - plane.center
             let distance = simd_dot(pointToPlane, plane.normal)
 
-            if distance > heightThreshold {
-                pointsAbovePlane += 1
+            // Only process points above the plane threshold
+            guard distance > heightThreshold else { continue }
+            pointsAbovePlane += 1
 
-                // Direct proportional mapping: depth map coords -> working image coords
-                let x = Int(CGFloat(point.pixelX) * scaleX)
-                let y = Int(CGFloat(point.pixelY) * scaleY)
+            // PROJECT 3D WORLD POSITION TO IMAGE COORDINATES
+            // This is the key - use 3D position and camera projection, not depth map pixels
+            guard let imagePoint = project3DToImage(
+                worldPoint: point.position,
+                cameraTransform: cameraTransform,
+                intrinsics: cameraIntrinsics,
+                imageSize: imageSize
+            ) else {
+                projectionFailures += 1
+                continue
+            }
 
-                // CRITICAL FIX: Only process points within workspace bounds
-                if let bounds = scaledWorkspaceBounds {
-                    let pointInWorkspace = CGPoint(x: CGFloat(x), y: CGFloat(y))
-                    guard bounds.contains(pointInWorkspace) else {
-                        continue  // Skip points outside workspace
-                    }
+            // Convert from image coordinates to working coordinates
+            let workingX = Int(imagePoint.x * imageToWorkingScaleX)
+            let workingY = Int(imagePoint.y * imageToWorkingScaleY)
+
+            // Check bounds
+            guard workingX >= 0 && workingX < workingWidth && workingY >= 0 && workingY < workingHeight else {
+                continue
+            }
+
+            // Filter by workspace bounds if provided
+            if let bounds = scaledWorkspaceBounds {
+                let pointInWorkspace = CGPoint(x: CGFloat(workingX), y: CGFloat(workingY))
+                guard bounds.contains(pointInWorkspace) else {
+                    continue
                 }
+            }
 
-                pointsInWorkspace += 1
+            pointsInWorkspace += 1
 
-                // Fill 5x5 region for better connectivity (reduced from 7x7)
-                for dy in -2...2 {
-                    for dx in -2...2 {
-                        let px = x + dx
-                        let py = y + dy
-                        if px >= 0 && px < workingWidth && py >= 0 && py < workingHeight {
-                            mask[py * workingWidth + px] = 255
-                        }
+            // Fill a region around the point for better connectivity
+            // Use smaller region (3x3) since we're projecting accurately now
+            for dy in -1...1 {
+                for dx in -1...1 {
+                    let px = workingX + dx
+                    let py = workingY + dy
+                    if px >= 0 && px < workingWidth && py >= 0 && py < workingHeight {
+                        mask[py * workingWidth + px] = 255
                     }
                 }
             }
@@ -138,11 +156,14 @@ class SegmentationProcessor {
 
         print("   Points above plane: \(pointsAbovePlane) / \(depthPoints.count) (\(Int(Double(pointsAbovePlane)/Double(max(depthPoints.count, 1))*100))%)")
         print("   Points in workspace: \(pointsInWorkspace)")
+        print("   Projection failures: \(projectionFailures)")
+        print("   Coverage in mask: \(mask.filter { $0 > 0 }.count) pixels")
 
         progressCallback?("Applying morphological operations...")
 
-        // Morphological closing with smaller, faster kernel
-        mask = morphologicalCloseMask(mask, width: workingWidth, height: workingHeight, kernelSize: 7)
+        // Apply morphological closing to connect nearby regions
+        // Use smaller kernel (5) for faster processing while maintaining quality
+        mask = morphologicalCloseMask(mask, width: workingWidth, height: workingHeight, kernelSize: 5)
 
         progressCallback?("Starting contour detection...")
 
@@ -170,11 +191,25 @@ class SegmentationProcessor {
 
         print("   After scaling: \(scaledContours.count)")
 
-        // SIMPLIFIED: Only filter by minimum area, no workspace bounds filtering
-        let minAreaPixels = 500.0 // Minimum area in pixels
-        let filteredContours = scaledContours.filter { $0.area > minAreaPixels }
+        // Filter by minimum area - be more permissive to catch small tools
+        // Convert to actual pixel area in the full image
+        let minAreaPixels = 200.0 // Reduced from 500 - allow smaller objects
+        let filteredByArea = scaledContours.filter { $0.area > minAreaPixels }
 
-        print("   After area filter (min \(minAreaPixels)): \(filteredContours.count)")
+        print("   After area filter (min \(minAreaPixels) px²): \(filteredByArea.count)")
+
+        // Filter out very thin/elongated contours that are likely noise
+        let filteredContours = filteredByArea.filter { contour in
+            let width = contour.boundingBox.width
+            let height = contour.boundingBox.height
+            let aspectRatio = max(width, height) / max(min(width, height), 1.0)
+
+            // Allow aspect ratios up to 10:1 (for long tools like wrenches)
+            return aspectRatio <= 10.0
+        }
+
+        print("   After aspect ratio filter: \(filteredContours.count)")
+        print("   Final contours for processing: \(filteredContours.count)")
 
         let processedImage = visualizeContours(contours: filteredContours, imageSize: imageSize)
 
@@ -185,7 +220,10 @@ class SegmentationProcessor {
         progressCallback?("Creating contour image...")
 
         // Convert mask to CGImage
-        guard let providerRef = CGDataProvider(data: Data(mask) as CFData) else { return [] }
+        guard let providerRef = CGDataProvider(data: Data(mask) as CFData) else {
+            print("⚠️ Failed to create data provider")
+            return []
+        }
 
         guard let cgImage = CGImage(
             width: width,
@@ -199,25 +237,38 @@ class SegmentationProcessor {
             decode: nil,
             shouldInterpolate: false,
             intent: .defaultIntent
-        ) else { return [] }
+        ) else {
+            print("⚠️ Failed to create CGImage from mask")
+            return []
+        }
 
         progressCallback?("Detecting contours with Vision framework...")
 
-        // Use Vision to detect contours
+        // Use Vision to detect contours with optimized parameters
         let request = VNDetectContoursRequest()
         request.contrastAdjustment = 1.0
         request.detectsDarkOnLight = false // White objects on black background
+        request.maximumImageDimension = max(width, height) // Use full resolution
 
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        try? handler.perform([request])
+
+        do {
+            try handler.perform([request])
+        } catch {
+            print("⚠️ Vision request failed: \(error)")
+            progressCallback?("Using fallback contour detection...")
+            return extractContoursFromMaskFast(mask, width: width, height: height, minSize: 15)
+        }
 
         progressCallback?("Processing detected contours...")
 
-        guard let observations = request.results else {
-            // Fallback to simple connected components
+        guard let observations = request.results, !observations.isEmpty else {
+            print("⚠️ No Vision observations, using fallback")
             progressCallback?("Using fallback contour detection...")
-            return extractContoursFromMaskFast(mask, width: width, height: height, minSize: 20)
+            return extractContoursFromMaskFast(mask, width: width, height: height, minSize: 15)
         }
+
+        print("   Vision observations: \(observations.count)")
 
         var contours: [Contour] = []
         let totalObservations = observations.count
@@ -232,12 +283,14 @@ class SegmentationProcessor {
             let topLevelContours = observation.topLevelContours
 
             for vnContour in topLevelContours {
-                // Get normalized points
+                // Get all points for accurate contour
                 let pointCount = vnContour.pointCount
+                guard pointCount >= 3 else { continue }
+
                 var points: [CGPoint] = []
 
-                // Sample points from the contour
-                let stepSize = max(1, pointCount / 100) // Sample up to 100 points
+                // Sample more points for better accuracy (up to 200 points per contour)
+                let stepSize = max(1, pointCount / 200)
                 for i in Swift.stride(from: 0, to: pointCount, by: stepSize) {
                     let normalizedPoint = vnContour.normalizedPoints[i]
                     // Convert from normalized (0-1) to pixel coordinates
@@ -250,14 +303,15 @@ class SegmentationProcessor {
                     let area = calculateContourArea(points)
                     let bbox = calculateBoundingBox(points)
 
-                    // Only include reasonably sized contours
-                    if area > 100 {
+                    // Be more permissive - accept smaller contours (50 vs 100)
+                    if area > 50 {
                         contours.append(Contour(points: points, area: area, boundingBox: bbox))
                     }
                 }
             }
         }
 
+        print("   Contours extracted from Vision: \(contours.count)")
         progressCallback?("Contour detection complete!")
         return contours
     }
@@ -304,9 +358,11 @@ class SegmentationProcessor {
         var nextLabel = 1
         var contours: [Contour] = []
 
-        // Connected components with size filtering
-        for y in stride(from: 0, to: height, by: 2) {  // Skip every other row for speed
-            for x in stride(from: 0, to: width, by: 2) {  // Skip every other column
+        print("   Fallback: extracting contours from mask (minSize: \(minSize))")
+
+        // Connected components - don't skip pixels for better detection
+        for y in 0..<height {
+            for x in 0..<width {
                 let idx = y * width + x
                 if mask[idx] > 128 && labeled[idx] == 0 {
                     // Start new component with iterative flood fill
@@ -318,8 +374,8 @@ class SegmentationProcessor {
                         let bbox = CGRect(
                             x: componentBounds.minX,
                             y: componentBounds.minY,
-                            width: componentBounds.maxX - componentBounds.minX,
-                            height: componentBounds.maxY - componentBounds.minY
+                            width: componentBounds.maxX - componentBounds.minX + 1,
+                            height: componentBounds.maxY - componentBounds.minY + 1
                         )
 
                         // Simple rectangular contour (fast)
@@ -342,6 +398,7 @@ class SegmentationProcessor {
             }
         }
 
+        print("   Fallback: found \(contours.count) contours")
         return contours
     }
 

@@ -1076,7 +1076,7 @@ struct ManualCaptureView: View {
             imageSize: captured.image.size,
             depthMapSize: captured.depthMapSize,
             workspaceBounds: workspaceBounds,
-            heightThreshold: 0.001,  // 1mm sensitivity for depth detection
+            heightThreshold: 0.002,  // 2mm sensitivity - more forgiving for detection
             progressCallback: { status in
                 DispatchQueue.main.async {
                     self.processingStatus = status
