@@ -151,123 +151,121 @@ struct ManualCaptureView: View {
                     .position(x: screenSize.width / 2, y: screenSize.height / 2)
             }
 
-            // UI Overlay
+            // UI Overlay - Minimal HUD design
             VStack {
-                // Top bar with enhanced glassmorphism
-                HStack {
-                    Button(action: onCancel) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 18))
-                            Text("Cancel")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.white, .white.opacity(0.9)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(.ultraThinMaterial)
-                        .background(Color.white.opacity(0.1))
-                        .cornerRadius(16)
-                        .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-
-                    Spacer()
-
-                    // Heat map toggle with gradient
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            showHeatMap.toggle()
-                        }
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: showHeatMap ? "circle.hexagongrid.fill" : "circle.hexagongrid")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text("Heat")
-                                .font(.caption.weight(.bold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(
-                            Group {
-                                if showHeatMap {
-                                    LinearGradient(
-                                        colors: [Color.orange, Color.red.opacity(0.8)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                } else {
-                                    LinearGradient(
-                                        colors: [Color.gray.opacity(0.4), Color.gray.opacity(0.3)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                }
+                // Top HUD bar with enhanced glassmorphism
+                VStack(spacing: 12) {
+                    HStack {
+                        Button(action: onCancel) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16))
+                                Text("Cancel")
+                                    .font(.caption.weight(.semibold))
                             }
-                        )
-                        .cornerRadius(14)
-                        .shadow(color: showHeatMap ? Color.orange.opacity(0.4) : .clear, radius: 8, y: 4)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-
-                    // Mode toggle with gradient
-                    Button(action: toggleMode) {
-                        HStack(spacing: 8) {
-                            Image(systemName: captureMode == .manual ? "hand.tap.fill" : "viewfinder.circle.fill")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text(captureMode == .manual ? "Manual" : "Auto")
-                                .font(.caption.weight(.bold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.blue, Color.blue.opacity(0.7)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.white, .white.opacity(0.9)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
-                        .cornerRadius(14)
-                        .shadow(color: Color.blue.opacity(0.4), radius: 8, y: 4)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                        )
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(12)
+                            .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+
+                        Spacer()
+
+                        // Heat map toggle with gradient
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                showHeatMap.toggle()
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: showHeatMap ? "circle.hexagongrid.fill" : "circle.hexagongrid")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text("Heat")
+                                    .font(.caption2.weight(.bold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                Group {
+                                    if showHeatMap {
+                                        LinearGradient(
+                                            colors: [Color.orange, Color.red.opacity(0.8)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    } else {
+                                        LinearGradient(
+                                            colors: [Color.gray.opacity(0.4), Color.gray.opacity(0.3)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    }
+                                }
+                            )
+                            .cornerRadius(10)
+                            .shadow(color: showHeatMap ? Color.orange.opacity(0.4) : .clear, radius: 8, y: 4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+
+                        // Mode toggle with gradient
+                        Button(action: toggleMode) {
+                            HStack(spacing: 6) {
+                                Image(systemName: captureMode == .manual ? "hand.tap.fill" : "viewfinder.circle.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text(captureMode == .manual ? "Manual" : "Auto")
+                                    .font(.caption2.weight(.bold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.blue, Color.blue.opacity(0.7)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .cornerRadius(10)
+                            .shadow(color: Color.blue.opacity(0.4), radius: 8, y: 4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(ScaleButtonStyle())
                     }
-                    .buttonStyle(ScaleButtonStyle())
+
+                    // Compact Detection status panel
+                    CompactDetectionStatusPanel(status: detectionStatus, mode: captureMode)
+
+                    // Compact instructions - only show when manual mode and placing corners
+                    if showGuide && captureMode == .manual && cornerPoints.count < 4 {
+                        CompactGuideView(cornerCount: cornerPoints.count, onDismiss: { showGuide = false })
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
                 .padding()
 
-                Spacer()
+                Spacer()  // This pushes everything to top and bottom, keeping center clear
 
-                // Detection status panel
-                DetectionStatusPanel(status: detectionStatus, mode: captureMode)
-                    .padding(.horizontal)
-
-                Spacer()
-
-                // Instructions
-                if showGuide && captureMode == .manual {
-                    ManualGuideView(cornerCount: cornerPoints.count, onDismiss: { showGuide = false })
-                        .padding()
-                        .transition(.scale.combined(with: .opacity))
-                }
-
-                // Status message with enhanced glassmorphism
+                // Status message at bottom with minimal design
                 Text(statusMessage)
-                    .font(.subheadline.weight(.medium))
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [.white, .white.opacity(0.95)],
@@ -275,14 +273,14 @@ struct ManualCaptureView: View {
                             endPoint: .bottom
                         )
                     )
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
                     .background(.ultraThinMaterial)
                     .background(Color.white.opacity(0.05))
-                    .cornerRadius(16)
+                    .cornerRadius(12)
                     .shadow(color: .black.opacity(0.15), radius: 10, y: 5)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: 12)
                             .stroke(
                                 LinearGradient(
                                     colors: [.white.opacity(0.3), .white.opacity(0.1)],
@@ -997,8 +995,8 @@ struct ManualCaptureView: View {
 
     private func performProcessing(captured: LiDARCaptureManager.CapturedFrame, plane: LiDARCaptureManager.DetectedPlane) {
         DispatchQueue.main.async {
-            self.processingStatus = "Detecting workspace..."
-            self.processingProgress = 0.1
+            self.processingStatus = "Setting up workspace..."
+            self.processingProgress = 0.05
         }
 
         var workspaceBounds: CGRect
@@ -1012,6 +1010,11 @@ struct ManualCaptureView: View {
                     self.isProcessing = false
                 }
                 return
+            }
+
+            DispatchQueue.main.async {
+                self.processingStatus = "Projecting workspace corners..."
+                self.processingProgress = 0.1
             }
 
             // Project all 4 world positions to screen coordinates on the captured image
@@ -1068,6 +1071,11 @@ struct ManualCaptureView: View {
             let worldWidthMM = avgWorldWidth * 1000.0  // Convert to mm
             pixelToMMScale = worldWidthMM / avgPixelWidth
         } else {
+            DispatchQueue.main.async {
+                self.processingStatus = "Detecting ArUco markers..."
+                self.processingProgress = 0.1
+            }
+
             // Use ArUco detection
             let arucoDetector = ArucoDetector()
             let detection = arucoDetector.detectMarkers(in: captured.image)
@@ -1091,52 +1099,87 @@ struct ManualCaptureView: View {
             return
         }
 
-        // Segment tools using DEPTH DATA (not image processing!)
+        // SENSOR FUSION: Blend RGB camera with LiDAR depth for enhanced accuracy
         DispatchQueue.main.async {
-            self.processingStatus = "Analyzing depth data..."
-            self.processingProgress = 0.3
+            self.processingStatus = "Fusing camera and LiDAR data..."
+            self.processingProgress = 0.15
         }
 
-        print("🔍 Starting tool detection...")
-        print("   Depth points: \(captured.depthData.count)")
+        print("🔀 Starting RGB-D sensor fusion...")
+        print("   Raw depth points: \(captured.depthData.count)")
         print("   Depth map size: \(captured.depthMapSize)")
         print("   Image size: \(captured.image.size)")
+
+        let fusionProcessor = SensorFusionProcessor()
+        let fusedResult = fusionProcessor.fuseRGBWithDepth(
+            rgbImage: captured.image,
+            depthPoints: captured.depthData,
+            depthMapSize: captured.depthMapSize,
+            imageSize: captured.image.size,
+            minDepthChange: 0.01  // 1cm threshold as required
+        )
+
+        // Use fused depth points (with RGB edge enhancement) or fall back to raw
+        let depthPointsToUse: [LiDARCaptureManager.DepthPoint]
+        if let fusedResult = fusedResult {
+            print("✅ Sensor fusion complete - \(fusedResult.depthPoints.count) enhanced points")
+            depthPointsToUse = fusionProcessor.convertToStandardDepthPoints(fusedResult.depthPoints)
+        } else {
+            print("⚠️ Sensor fusion unavailable - using raw LiDAR data")
+            depthPointsToUse = captured.depthData
+        }
+
+        // Segment tools using ENHANCED DEPTH DATA with RGB guidance
+        DispatchQueue.main.async {
+            self.processingStatus = "Detecting tools from enhanced depth map..."
+            self.processingProgress = 0.25
+        }
+
+        print("🔍 Starting tool detection with \(depthPointsToUse.count) depth points...")
 
         let segmenter = SegmentationProcessor()
 
         // Use depth-based segmentation with progress callbacks
         let segmentation = segmenter.segmentToolsFromDepth(
-            depthPoints: captured.depthData,
+            depthPoints: depthPointsToUse,
             plane: plane,
             cameraTransform: captured.cameraTransform,
             cameraIntrinsics: captured.cameraIntrinsics,
             imageSize: captured.image.size,
             depthMapSize: captured.depthMapSize,
             workspaceBounds: workspaceBounds,
-            heightThreshold: 0.001,
+            heightThreshold: 0.001,  // 1mm sensitivity for depth detection
             progressCallback: { status in
                 DispatchQueue.main.async {
                     self.processingStatus = status
-                    self.processingProgress = 0.4
+                    // Map to progress range 0.25 - 0.5
+                    self.processingProgress = 0.25 + (0.25 * 0.5)  // Increment within range
                 }
             }
         )
 
         print("✅ Found \(segmentation.contours.count) contours")
 
-        let scaledContours = segmentation.contours
-
-        // Process geometry
         DispatchQueue.main.async {
-            self.processingStatus = "Processing geometry..."
-            self.processingProgress = 0.6
+            self.processingStatus = "Found \(segmentation.contours.count) tools - processing shapes..."
+            self.processingProgress = 0.5
         }
 
+        let scaledContours = segmentation.contours
+
+        // Process geometry with progress updates
         let geometryProcessor = GeometryProcessor()
         var tools: [Tool] = []
 
-        for contour in scaledContours {
+        for (index, contour) in scaledContours.enumerated() {
             autoreleasepool {
+                // Update progress for each tool
+                let toolProgress = 0.5 + (0.3 * Double(index) / Double(max(scaledContours.count, 1)))
+                DispatchQueue.main.async {
+                    self.processingStatus = "Processing tool \(index + 1) of \(scaledContours.count)..."
+                    self.processingProgress = toolProgress
+                }
+
                 let simplified = geometryProcessor.simplifyContour(contour.points, tolerance: 2.0)
 
                 let depths = lidarManager.getDepthAtContour(
@@ -1169,6 +1212,11 @@ struct ManualCaptureView: View {
             }
         }
 
+        DispatchQueue.main.async {
+            self.processingStatus = "Saving project data..."
+            self.processingProgress = 0.8
+        }
+
         // Use filename-safe date format (no slashes)
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -1183,19 +1231,19 @@ struct ManualCaptureView: View {
             project.capturedImage = imageData
         }
 
-        // Generate depth map visualization
+        // OPTIMIZED: Generate depth map with faster single-pass algorithm
         DispatchQueue.main.async {
-            self.processingStatus = "Creating depth map..."
-            self.processingProgress = 0.85
+            self.processingStatus = "Generating depth visualization..."
+            self.processingProgress = 0.9
         }
 
-        if let depthMapImage = self.generateDepthMapVisualization(
+        if let depthMapImage = self.generateOptimizedDepthMapVisualization(
             depthPoints: captured.depthData,
             plane: plane,
             imageSize: captured.image.size,
             depthMapSize: captured.depthMapSize
         ) {
-            if let depthMapData = depthMapImage.jpegData(compressionQuality: 0.9) {
+            if let depthMapData = depthMapImage.jpegData(compressionQuality: 0.85) {
                 project.depthMap = depthMapData
             }
         }
@@ -1357,6 +1405,122 @@ struct ManualCaptureView: View {
         return UIImage(cgImage: cgImage)
     }
 
+    // OPTIMIZED: Single-pass depth map generation with faster nearest neighbor interpolation
+    private func generateOptimizedDepthMapVisualization(
+        depthPoints: [LiDARCaptureManager.DepthPoint],
+        plane: LiDARCaptureManager.DetectedPlane,
+        imageSize: CGSize,
+        depthMapSize: CGSize
+    ) -> UIImage? {
+        // Use more reasonable resolution for faster processing
+        let targetWidth = 800  // Reduced from 1024 for speed
+        let targetHeight = Int(CGFloat(targetWidth) * imageSize.height / imageSize.width)
+        let width = targetWidth
+        let height = targetHeight
+
+        // Find min/max heights above plane for color mapping
+        var minHeight: Float = Float.infinity
+        var maxHeight: Float = -Float.infinity
+
+        for point in depthPoints {
+            let pointToPlane = point.position - plane.center
+            let distance = simd_dot(pointToPlane, plane.normal)
+            if distance > 0 {
+                minHeight = min(minHeight, distance)
+                maxHeight = max(maxHeight, distance)
+            }
+        }
+
+        // If no points above plane, return nil
+        guard minHeight != Float.infinity else { return nil }
+
+        let heightRange = max(maxHeight - minHeight, 0.001)
+
+        // Create sparse depth map at original resolution
+        let sparseWidth = Int(depthMapSize.width)
+        let sparseHeight = Int(depthMapSize.height)
+        var sparseDepth = [Float](repeating: -1, count: sparseWidth * sparseHeight)
+
+        // Fill sparse depth map
+        for point in depthPoints {
+            let pointToPlane = point.position - plane.center
+            let distance = simd_dot(pointToPlane, plane.normal)
+
+            if distance > 0 {
+                let x = point.pixelX
+                let y = point.pixelY
+                if x >= 0 && x < sparseWidth && y >= 0 && y < sparseHeight {
+                    sparseDepth[y * sparseWidth + x] = distance
+                }
+            }
+        }
+
+        // Single-pass nearest neighbor upsampling (much faster!)
+        let scaleX = Float(width) / Float(sparseWidth)
+        let scaleY = Float(height) / Float(sparseHeight)
+
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+
+        for y in 0..<height {
+            for x in 0..<width {
+                // Map to sparse coordinates (nearest neighbor)
+                let sx = Int(Float(x) / scaleX)
+                let sy = Int(Float(y) / scaleY)
+
+                // Search small radius for nearest valid depth point
+                var foundDepth: Float = -1
+                let searchRadius = 3
+
+                searchLoop: for dy in -searchRadius...searchRadius {
+                    for dx in -searchRadius...searchRadius {
+                        let ssx = sx + dx
+                        let ssy = sy + dy
+                        if ssx >= 0 && ssx < sparseWidth && ssy >= 0 && ssy < sparseHeight {
+                            let depth = sparseDepth[ssy * sparseWidth + ssx]
+                            if depth > 0 {
+                                foundDepth = depth
+                                break searchLoop
+                            }
+                        }
+                    }
+                }
+
+                if foundDepth > 0 {
+                    // Normalize height to 0-1 range
+                    let normalizedHeight = (foundDepth - minHeight) / heightRange
+
+                    // Convert to heat map color
+                    let (r, g, b) = heightToColor(normalizedHeight: CGFloat(normalizedHeight))
+
+                    let pixelIndex = (y * width + x) * 4
+                    pixels[pixelIndex] = UInt8(r * 255)
+                    pixels[pixelIndex + 1] = UInt8(g * 255)
+                    pixels[pixelIndex + 2] = UInt8(b * 255)
+                    pixels[pixelIndex + 3] = 255
+                }
+            }
+        }
+
+        // Create CGImage from pixel data
+        guard let providerRef = CGDataProvider(data: Data(pixels) as CFData) else { return nil }
+
+        guard let cgImage = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: providerRef,
+            decode: nil,
+            shouldInterpolate: true,
+            intent: .defaultIntent
+        ) else { return nil }
+
+        return UIImage(cgImage: cgImage)
+    }
+
     private func heightToColor(normalizedHeight: CGFloat) -> (CGFloat, CGFloat, CGFloat) {
         // Heat map: Blue (low) -> Cyan -> Green -> Yellow -> Red (high)
         let h = max(0, min(1, normalizedHeight))
@@ -1454,276 +1618,133 @@ struct CornerMarker: View {
     }
 }
 
-// MARK: - Detection Status Panel
-struct DetectionStatusPanel: View {
+// MARK: - Compact Detection Status Panel (Top HUD)
+struct CompactDetectionStatusPanel: View {
     let status: ManualCaptureView.DetectionStatus
     let mode: ManualCaptureView.CaptureMode
 
     var body: some View {
         let distanceGood = status.distanceToPlane >= 60 && status.distanceToPlane <= 100
         let angleGood = status.angleToPlane < 15
-        let pointsGood = status.pointsAbovePlane > 20
 
-        return VStack(spacing: 8) {
-            // First row: Plane and markers (if auto mode)
-            HStack(spacing: 12) {
-                StatusBadge(
-                    icon: "cube.transparent",
-                    label: "Plane",
-                    value: status.planeQuality,
-                    isGood: status.planeDetected
-                )
-
-                if mode == .automatic {
-                    StatusBadge(
-                        icon: "qrcode",
-                        label: "Markers",
-                        value: "\(status.arucoMarkersDetected)/4",
-                        isGood: status.arucoMarkersDetected >= 4
-                    )
-                }
-            }
-
-            // Second row: Live metrics when plane detected
-            if status.planeDetected {
-                HStack(spacing: 12) {
-                    // Distance
-                    StatusBadge(
-                        icon: "arrow.up.and.down",
-                        label: "Distance",
-                        value: String(format: "%.0f cm", status.distanceToPlane),
-                        isGood: distanceGood
-                    )
-
-                    // Angle
-                    StatusBadge(
-                        icon: "angle",
-                        label: "Angle",
-                        value: String(format: "%.0f°", status.angleToPlane),
-                        isGood: angleGood
-                    )
-
-                    // Points above plane
-                    StatusBadge(
-                        icon: "circle.hexagongrid.fill",
-                        label: "Objects",
-                        value: "\(status.pointsAbovePlane)",
-                        isGood: pointsGood
-                    )
-                }
-
-                // Guidance text
-                if !distanceGood || !angleGood {
-                    Text(guidanceText)
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 4)
-                }
-            }
-        }
-        .padding(16)
-        .background(.ultraThinMaterial)
-        .background(
-            LinearGradient(
-                colors: [Color.white.opacity(0.08), Color.white.opacity(0.03)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+        return HStack(spacing: 8) {
+            // Plane status
+            CompactStatusBadge(
+                icon: "cube.transparent",
+                value: status.planeDetected ? "✓" : "⊘",
+                isGood: status.planeDetected
             )
-        )
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.2), radius: 15, y: 8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    LinearGradient(
-                        colors: [.white.opacity(0.3), .white.opacity(0.1)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
+
+            // Distance (when plane detected)
+            if status.planeDetected {
+                CompactStatusBadge(
+                    icon: "arrow.up.and.down",
+                    value: String(format: "%.0f cm", status.distanceToPlane),
+                    isGood: distanceGood
                 )
-        )
-    }
 
-    private var guidanceText: String {
-        let distance = status.distanceToPlane
-        let angle = status.angleToPlane
+                // Angle
+                CompactStatusBadge(
+                    icon: "angle",
+                    value: String(format: "%.0f°", status.angleToPlane),
+                    isGood: angleGood
+                )
+            }
 
-        if angle > 15 {
-            return "📱 Hold phone more parallel to surface"
-        } else if distance < 60 {
-            return "⬆️ Move phone farther away (60-100cm ideal)"
-        } else if distance > 100 {
-            return "⬇️ Move phone closer (60-100cm ideal)"
+            // Markers (auto mode only)
+            if mode == .automatic {
+                CompactStatusBadge(
+                    icon: "qrcode",
+                    value: "\(status.arucoMarkersDetected)/4",
+                    isGood: status.arucoMarkersDetected >= 4
+                )
+            }
         }
-        return "✓ Good position"
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
     }
 }
 
-struct StatusBadge: View {
+// MARK: - Compact Status Badge (for HUD)
+struct CompactStatusBadge: View {
     let icon: String
-    let label: String
     let value: String
     let isGood: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             Image(systemName: icon)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: isGood ? [.green, .green.opacity(0.8)] : [.orange, .orange.opacity(0.8)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .font(.system(size: 18, weight: .semibold))
-                .shadow(color: (isGood ? Color.green : Color.orange).opacity(0.3), radius: 4)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(isGood ? .green : .orange)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(label)
-                    .font(.caption2.weight(.medium))
-                    .foregroundColor(.white.opacity(0.7))
-                Text(value)
-                    .font(.caption.bold())
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: isGood ? [.green, .green.opacity(0.9)] : [.orange, .orange.opacity(0.9)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-            }
+            Text(value)
+                .font(.caption2.bold())
+                .foregroundColor(isGood ? .green : .orange)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color.black.opacity(0.25))
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.15), radius: 5, y: 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(
-                    LinearGradient(
-                        colors: [.white.opacity(0.2), .white.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.black.opacity(0.3))
+        .cornerRadius(8)
     }
 }
 
-// MARK: - Manual Guide
-struct ManualGuideView: View {
+// MARK: - Compact Guide View (Top HUD)
+struct CompactGuideView: View {
     let cornerCount: Int
     let onDismiss: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "hand.point.up.left.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.blue, .blue.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    Text("Manual Corner Selection")
-                        .font(.headline.weight(.semibold))
-                        .foregroundColor(.white)
-                }
-                Spacer()
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundColor(.white.opacity(0.8))
-                }
-            }
+        HStack(spacing: 8) {
+            Image(systemName: "hand.tap.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.blue)
 
-            VStack(alignment: .leading, spacing: 10) {
-                InstructionStep(
-                    number: 1,
-                    text: "Align reticle with workspace corner",
-                    isActive: cornerCount == 0
-                )
-                InstructionStep(
-                    number: 2,
-                    text: "Tap to place corner marker",
-                    isActive: cornerCount == 0
-                )
-                InstructionStep(
-                    number: 3,
-                    text: "Repeat for all 4 corners",
-                    isActive: cornerCount > 0 && cornerCount < 4
-                )
-                InstructionStep(
-                    number: 4,
-                    text: "Tap capture when complete",
-                    isActive: cornerCount == 4
-                )
+            Text(guideText)
+                .font(.caption.weight(.medium))
+                .foregroundColor(.white)
+
+            Spacer()
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.white.opacity(0.7))
             }
         }
-        .padding(20)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(.ultraThinMaterial)
         .background(
             LinearGradient(
-                colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+                colors: [Color.blue.opacity(0.15), Color.blue.opacity(0.05)],
+                startPoint: .leading,
+                endPoint: .trailing
             )
         )
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.25), radius: 20, y: 10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    LinearGradient(
-                        colors: [.white.opacity(0.4), .white.opacity(0.1)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
-                )
-        )
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
     }
-}
 
-private struct InstructionStep: View {
-    let number: Int
-    let text: String
-    let isActive: Bool
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: isActive ? [.blue, .blue.opacity(0.7)] : [.white.opacity(0.15), .white.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 28, height: 28)
-                    .shadow(color: isActive ? .blue.opacity(0.4) : .clear, radius: 6)
-
-                Text("\(number)")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(isActive ? .white : .white.opacity(0.6))
-            }
-
-            Text(text)
-                .foregroundColor(isActive ? .white : .white.opacity(0.7))
-                .font(isActive ? .subheadline.weight(.semibold) : .subheadline.weight(.medium))
+    private var guideText: String {
+        switch cornerCount {
+        case 0:
+            return "Align reticle with corner, then tap +"
+        case 1:
+            return "Corner 1/4 placed - tap for next"
+        case 2:
+            return "Corner 2/4 placed - tap for next"
+        case 3:
+            return "Corner 3/4 placed - tap for final"
+        default:
+            return "All corners placed!"
         }
-        .padding(.vertical, 4)
     }
 }
+
 
 // MARK: - AR Camera View with Hit Testing
 struct ARCameraViewWithHitTest: UIViewRepresentable {
