@@ -592,6 +592,30 @@ struct ManualCaptureView: View {
         return nil
     }
 
+    // Project world position to captured image coordinates (not screen coordinates)
+    private func projectToImageCoordinates(worldPosition: simd_float3, frame: ARFrame, imageSize: CGSize) -> CGPoint? {
+        let viewMatrix = frame.camera.viewMatrix(for: .portrait)
+        let projectionMatrix = frame.camera.projectionMatrix(for: .portrait, viewportSize: imageSize, zNear: 0.001, zFar: 1000)
+
+        // Transform to clip space
+        let worldPos4 = simd_float4(worldPosition.x, worldPosition.y, worldPosition.z, 1.0)
+        let viewPos = viewMatrix * worldPos4
+        let clipPos = projectionMatrix * viewPos
+
+        // Perspective divide
+        if clipPos.w != 0 {
+            let ndc = simd_float3(clipPos.x / clipPos.w, clipPos.y / clipPos.w, clipPos.z / clipPos.w)
+
+            // Convert to image coordinates using image size
+            let imageX = (ndc.x + 1.0) * 0.5 * Float(imageSize.width)
+            let imageY = (1.0 - ndc.y) * 0.5 * Float(imageSize.height)
+
+            return CGPoint(x: CGFloat(imageX), y: CGFloat(imageY))
+        }
+
+        return nil
+    }
+
     private func distance(_ p1: CGPoint, _ p2: CGPoint) -> Double {
         let dx = p2.x - p1.x
         let dy = p2.y - p1.y
@@ -912,11 +936,11 @@ struct ManualCaptureView: View {
                 self.processingProgress = 0.1
             }
 
-            // Project all 4 world positions to screen coordinates on the captured image
+            // Project all 4 world positions to IMAGE coordinates (not screen coordinates)
             var projectedCorners: [CGPoint] = []
             for worldPos in cornerWorldPositions {
-                if let screenPos = projectToScreen(worldPosition: worldPos, frame: finalFrame) {
-                    projectedCorners.append(screenPos)
+                if let imagePos = projectToImageCoordinates(worldPosition: worldPos, frame: finalFrame, imageSize: captured.image.size) {
+                    projectedCorners.append(imagePos)
                 }
             }
 
@@ -948,9 +972,11 @@ struct ManualCaptureView: View {
                 height: min(captured.image.size.height - max(0, minY - paddingY), boundsHeight + 2 * paddingY)
             )
 
-            print("📦 Workspace bounds (with padding): \(workspaceBounds)")
-            print("   Corners projected: \(projectedCorners)")
+            print("📦 Workspace bounds calculation:")
             print("   Image size: \(captured.image.size)")
+            print("   Projected corners (in image coords): \(projectedCorners)")
+            print("   Workspace bounds (with 10% padding): \(workspaceBounds)")
+            print("   Bounds coverage: \(Int(workspaceBounds.width / captured.image.size.width * 100))% width, \(Int(workspaceBounds.height / captured.image.size.height * 100))% height")
 
             // Calculate real-world scale from 3D distances
             // Use the distance between first two corners as reference
