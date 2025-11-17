@@ -66,7 +66,7 @@ struct ManualCaptureView: View {
                         }
                     }
                 )
-                .transition(.opacity)
+                .transition(AnyTransition.opacity)
                 .zIndex(100)
             }
         }
