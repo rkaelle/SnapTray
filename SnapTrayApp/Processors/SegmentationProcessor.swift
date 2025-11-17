@@ -64,22 +64,40 @@ class SegmentationProcessor {
     ) -> SegmentationResult {
         progressCallback?("Analyzing depth data...")
 
-        // Use larger working size for better detail
-        let workingWidth = 1024
-        let workingHeight = Int(1024 * imageSize.height / imageSize.width)
+        // Use smaller working size for faster processing
+        let workingWidth = 800  // Reduced from 1024
+        let workingHeight = Int(800 * imageSize.height / imageSize.width)
 
         print("🎯 Depth detection setup:")
         print("   Image size: \(imageSize.width)x\(imageSize.height)")
         print("   Working size: \(workingWidth)x\(workingHeight)")
         print("   Depth map: \(depthMapSize.width)x\(depthMapSize.height)")
         print("   Height threshold: \(heightThreshold)m")
+        print("   Workspace bounds: \(workspaceBounds?.debugDescription ?? "none")")
 
         var mask = [UInt8](repeating: 0, count: workingWidth * workingHeight)
         var pointsAbovePlane = 0
+        var pointsInWorkspace = 0
 
         // Direct proportional scale from depth map to working image
         let scaleX = CGFloat(workingWidth) / depthMapSize.width
         let scaleY = CGFloat(workingHeight) / depthMapSize.height
+
+        // Scale workspace bounds to working size
+        let scaledWorkspaceBounds: CGRect?
+        if let bounds = workspaceBounds {
+            let boundsScaleX = CGFloat(workingWidth) / imageSize.width
+            let boundsScaleY = CGFloat(workingHeight) / imageSize.height
+            scaledWorkspaceBounds = CGRect(
+                x: bounds.origin.x * boundsScaleX,
+                y: bounds.origin.y * boundsScaleY,
+                width: bounds.width * boundsScaleX,
+                height: bounds.height * boundsScaleY
+            )
+            print("   Scaled workspace: \(scaledWorkspaceBounds!)")
+        } else {
+            scaledWorkspaceBounds = nil
+        }
 
         print("   Scale factors: X=\(scaleX), Y=\(scaleY)")
 
@@ -95,9 +113,19 @@ class SegmentationProcessor {
                 let x = Int(CGFloat(point.pixelX) * scaleX)
                 let y = Int(CGFloat(point.pixelY) * scaleY)
 
-                // Fill 7x7 region for better connectivity
-                for dy in -3...3 {
-                    for dx in -3...3 {
+                // CRITICAL FIX: Only process points within workspace bounds
+                if let bounds = scaledWorkspaceBounds {
+                    let pointInWorkspace = CGPoint(x: CGFloat(x), y: CGFloat(y))
+                    guard bounds.contains(pointInWorkspace) else {
+                        continue  // Skip points outside workspace
+                    }
+                }
+
+                pointsInWorkspace += 1
+
+                // Fill 5x5 region for better connectivity (reduced from 7x7)
+                for dy in -2...2 {
+                    for dx in -2...2 {
                         let px = x + dx
                         let py = y + dy
                         if px >= 0 && px < workingWidth && py >= 0 && py < workingHeight {
@@ -109,11 +137,12 @@ class SegmentationProcessor {
         }
 
         print("   Points above plane: \(pointsAbovePlane) / \(depthPoints.count) (\(Int(Double(pointsAbovePlane)/Double(max(depthPoints.count, 1))*100))%)")
+        print("   Points in workspace: \(pointsInWorkspace)")
 
         progressCallback?("Applying morphological operations...")
 
-        // Morphological closing with larger kernel
-        mask = morphologicalCloseMask(mask, width: workingWidth, height: workingHeight, kernelSize: 15)
+        // Morphological closing with smaller, faster kernel
+        mask = morphologicalCloseMask(mask, width: workingWidth, height: workingHeight, kernelSize: 7)
 
         progressCallback?("Starting contour detection...")
 
