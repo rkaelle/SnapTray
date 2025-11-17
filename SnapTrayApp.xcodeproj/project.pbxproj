@@ -27,6 +27,8 @@
 		A100000000000058 /* ImprovedCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000059 /* ImprovedCaptureView.swift */; };
 		A100000000000060 /* MarkersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000061 /* MarkersView.swift */; };
 		A100000000000062 /* ManualCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000063 /* ManualCaptureView.swift */; };
+		A100000000000064 /* ProcessingPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000065 /* ProcessingPageView.swift */; };
+		A100000000000066 /* SensorFusionProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000067 /* SensorFusionProcessor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -52,6 +54,8 @@
 		A100000000000059 /* ImprovedCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImprovedCaptureView.swift; sourceTree = "<group>"; };
 		A100000000000061 /* MarkersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkersView.swift; sourceTree = "<group>"; };
 		A100000000000063 /* ManualCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualCaptureView.swift; sourceTree = "<group>"; };
+		A100000000000065 /* ProcessingPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingPageView.swift; sourceTree = "<group>"; };
+		A100000000000067 /* SensorFusionProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorFusionProcessor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -109,6 +113,7 @@
 				A100000000000010 /* ArucoDetector.swift */,
 				A100000000000012 /* SegmentationProcessor.swift */,
 				A100000000000014 /* GeometryProcessor.swift */,
+				A100000000000067 /* SensorFusionProcessor.swift */,
 			);
 			path = Processors;
 			sourceTree = "<group>";
@@ -137,6 +142,7 @@
 				A100000000000059 /* ImprovedCaptureView.swift */,
 				A100000000000061 /* MarkersView.swift */,
 				A100000000000063 /* ManualCaptureView.swift */,
+				A100000000000065 /* ProcessingPageView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -229,6 +235,8 @@
 				A100000000000058 /* ImprovedCaptureView.swift in Sources */,
 				A100000000000060 /* MarkersView.swift in Sources */,
 				A100000000000062 /* ManualCaptureView.swift in Sources */,
+				A100000000000064 /* ProcessingPageView.swift in Sources */,
+				A100000000000066 /* SensorFusionProcessor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
