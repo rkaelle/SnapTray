@@ -652,6 +652,7 @@ struct ManualCaptureView: View {
 
         // Create new timer and store it - runs at 10Hz (100ms) for better performance
         var lastMarkerCheck = Date()
+        var lastPointsUpdate = Date()
 
         detectionTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [self] timer in
             guard !isProcessing else { return }
@@ -685,8 +686,9 @@ struct ManualCaptureView: View {
                         let angleRad = acos(abs(simd_dot(cameraForward, plane.normal)))
                         self.detectionStatus.angleToPlane = angleRad * 180.0 / .pi
 
-                        // Count points above plane (only update occasionally)
-                        if Date().timeIntervalSince(lastHeatMapUpdate) > 0.3 {
+                        // Count points above plane (only update occasionally to save performance)
+                        if Date().timeIntervalSince(lastPointsUpdate) > 0.3 {
+                            lastPointsUpdate = Date()
                             if let sceneDepth = frame.sceneDepth {
                                 self.detectionStatus.pointsAbovePlane = self.countPointsAbovePlane(
                                     frame: frame,
