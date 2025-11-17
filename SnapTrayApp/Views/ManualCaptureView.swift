@@ -1100,38 +1100,23 @@ struct ManualCaptureView: View {
         }
 
         // SENSOR FUSION: Blend RGB camera with LiDAR depth for enhanced accuracy
+        // Note: Temporarily using raw LiDAR until SensorFusionProcessor is added to Xcode target
         DispatchQueue.main.async {
-            self.processingStatus = "Fusing camera and LiDAR data..."
+            self.processingStatus = "Analyzing LiDAR depth data..."
             self.processingProgress = 0.15
         }
 
-        print("🔀 Starting RGB-D sensor fusion...")
-        print("   Raw depth points: \(captured.depthData.count)")
+        print("🔍 Starting tool detection...")
+        print("   Depth points: \(captured.depthData.count)")
         print("   Depth map size: \(captured.depthMapSize)")
         print("   Image size: \(captured.image.size)")
 
-        let fusionProcessor = SensorFusionProcessor()
-        let fusedResult = fusionProcessor.fuseRGBWithDepth(
-            rgbImage: captured.image,
-            depthPoints: captured.depthData,
-            depthMapSize: captured.depthMapSize,
-            imageSize: captured.image.size,
-            minDepthChange: 0.01  // 1cm threshold as required
-        )
+        // Use raw depth data (sensor fusion will be enabled once SensorFusionProcessor is added to target)
+        let depthPointsToUse = captured.depthData
 
-        // Use fused depth points (with RGB edge enhancement) or fall back to raw
-        let depthPointsToUse: [LiDARCaptureManager.DepthPoint]
-        if let fusedResult = fusedResult {
-            print("✅ Sensor fusion complete - \(fusedResult.depthPoints.count) enhanced points")
-            depthPointsToUse = fusionProcessor.convertToStandardDepthPoints(fusedResult.depthPoints)
-        } else {
-            print("⚠️ Sensor fusion unavailable - using raw LiDAR data")
-            depthPointsToUse = captured.depthData
-        }
-
-        // Segment tools using ENHANCED DEPTH DATA with RGB guidance
+        // Segment tools using depth data
         DispatchQueue.main.async {
-            self.processingStatus = "Detecting tools from enhanced depth map..."
+            self.processingStatus = "Detecting tools from depth map..."
             self.processingProgress = 0.25
         }
 
